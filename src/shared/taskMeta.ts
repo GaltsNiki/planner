@@ -70,6 +70,24 @@ export function extractLink(desc: string): LinkInfo | null {
 }
 
 /**
+ * Remove the first occurrence of a time token (e.g. "07:00" or "7.00") from
+ * display text, so the description line doesn't repeat the time chip.
+ * Also trims a trailing separator (–, —, -, :, ,, .) left behind.
+ */
+export function stripTime(text: string, time: string): string {
+  if (!text || !time) return text
+  const [h, mm] = time.split(':')
+  // Match "HH:MM" / "H:MM" / "HH.MM" with optional leading zero, as a whole token.
+  const hAlt = h.replace(/^0/, '0?') // 07 → 0?7 so "7:00" matches too
+  const re = new RegExp(`(?:^|\\b)${hAlt}[:.]${mm}\\b`)
+  return text
+    .replace(re, '')
+    .replace(/^[\s–—\-:,.]+/, '') // drop a leftover leading separator
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
  * Comparator ordering tasks by their derived time within a group.
  * Tasks with a time come first (earliest first); timeless tasks keep their order.
  */

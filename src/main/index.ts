@@ -2,6 +2,14 @@ import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { registerIpc } from './ipc'
 
+// App icon lives in build/ at the repo root (../../build relative to out/main).
+// .ico gives the crispest Windows taskbar/titlebar; PNG is the cross-platform fallback.
+const iconPath = join(
+  __dirname,
+  '../../build',
+  process.platform === 'win32' ? 'icon.ico' : 'icon.png'
+)
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -12,6 +20,7 @@ function createWindow(): void {
     backgroundColor: '#0d0d0f',
     autoHideMenuBar: true,
     title: 'Planner',
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       // Security-first per the development plan.
@@ -56,6 +65,8 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Ensures Windows groups the app under its own taskbar icon (not Electron's).
+  if (process.platform === 'win32') app.setAppUserModelId('com.planner.app')
   registerIpc()
   createWindow()
 

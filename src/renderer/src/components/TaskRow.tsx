@@ -1,6 +1,6 @@
 import React from 'react'
 import { usePlanner } from '../store'
-import { linkify, extractTime } from '@shared/taskMeta'
+import { linkify, extractTime, stripTime } from '@shared/taskMeta'
 import { useContextMenu } from './ContextMenu'
 import { COLORS } from '../tokens'
 import type { Task, Goal } from '@shared/types'
@@ -11,8 +11,10 @@ export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.E
   const menu = useContextMenu()
 
   const li = linkify(task.desc || '')
-  const short = li.textOnly || (li.primary ? 'Ссылка: ' + li.primary.label : '')
   const time = extractTime(task.desc || '')
+  // Don't repeat the time in the description line — it's already shown as a chip.
+  const textNoTime = stripTime(li.textOnly, time)
+  const short = textNoTime || (li.primary ? 'Ссылка: ' + li.primary.label : '')
 
   const stop = (e: React.SyntheticEvent): void => e.stopPropagation()
 

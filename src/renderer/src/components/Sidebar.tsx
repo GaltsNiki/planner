@@ -53,9 +53,7 @@ export function Sidebar(): React.JSX.Element {
   return (
     <div style={{ width: 264, flex: 'none', display: 'flex', flexDirection: 'column', background: COLORS.sidebarBg, borderRight: `1px solid ${COLORS.border}`, padding: '18px 14px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 8px 20px' }}>
-        <div style={{ width: 26, height: 26, borderRadius: 8, background: 'linear-gradient(135deg,#E8563F,#f0855f)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', boxShadow: '0 2px 8px rgba(232,86,63,0.35)' }}>
-          <div style={{ width: 9, height: 9, background: '#fff', borderRadius: 2, transform: 'rotate(45deg)' }} />
-        </div>
+        <img src="/icon.png" alt="Planner" width={28} height={28} style={{ flex: 'none', borderRadius: 7, boxShadow: '0 2px 8px rgba(232,86,63,0.35)' }} />
         <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.2px' }}>Planner</div>
         <button
           onClick={toggleSidebar}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractTime, extractLink, linkify, byTime } from '../taskMeta'
+import { extractTime, extractLink, linkify, byTime, stripTime } from '../taskMeta'
 
 describe('extractTime', () => {
   it('extracts an HH:MM token', () => {
@@ -20,6 +20,23 @@ describe('extractTime', () => {
   it('returns empty when none present', () => {
     expect(extractTime('Купить продукты')).toBe('')
     expect(extractTime('')).toBe('')
+  })
+})
+
+describe('stripTime', () => {
+  it('removes the time token shown in the chip from the description line', () => {
+    expect(stripTime('19:00 Созвон с тьютором', '19:00')).toBe('Созвон с тьютором')
+    expect(stripTime('Созвон в 19:00', '19:00')).toBe('Созвон в')
+  })
+  it('drops a leftover leading separator', () => {
+    expect(stripTime('07:00 — пробежка', '07:00')).toBe('пробежка')
+    expect(stripTime('7:05, лёгкий темп', '07:05')).toBe('лёгкий темп')
+  })
+  it('matches a single-digit hour against the padded chip time', () => {
+    expect(stripTime('в 7:05 старт', '07:05')).toBe('в старт')
+  })
+  it('is a no-op when there is no time', () => {
+    expect(stripTime('Купить продукты', '')).toBe('Купить продукты')
   })
 })
 
