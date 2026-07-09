@@ -1,0 +1,183 @@
+import React, { useState } from 'react'
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
+  type DragEndEvent, type DragStartEvent
+} from '@dnd-kit/core'
+import { usePlanner } from '../store'
+import { GoalDot } from '../components/primitives'
+import { WeekAnalytics } from '../components/WeekAnalytics'
+import { WeekendIdeas } from '../components/WeekendIdeas'
+import { Calendar } from '../components/Calendar'
+import { useContextMenu, type MenuItem } from '../components/ContextMenu'
+import { weekModel, weekBadge, DAY_SHORT, offsetToDate, dateToOffset } from '@shared/dates'
+import { COLORS } from '../tokens'
+import type { Task, Goal } from '@shared/types'
+
+/** Max cards shown before a column becomes internally scrollable. */
+const MAX_VISIBLE = 8
+const CARD_H = 40 // approx card height incl. gap, for the scroll cap
+
+/** The visual card body — shared by the in-column card and the drag overlay. */
+function CardBody({ task, goal, dragging }: { task: Task; goal: Goal; dragging?: boolean }): React.JSX.Element {
+  const { toggleTask } = usePlanner()
+  return (
+    <div
+      className={dragging ? undefined : 'row-hover'}
+      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 9px', background: dragging ? '#26262b' : 'rgba(255,255,255,0.03)', border: `1px solid ${dragging ? COLORS.accent30 : COLORS.border06}`, borderRadius: 9, cursor: dragging ? 'grabbing' : 'grab', fontSize: 12, boxShadow: dragging ? '0 8px 22px rgba(0,0,0,0.45)' : 'none' }}
+    >
+      <div onClick={(e) => { e.stopPropagation(); toggleTask(task.id) }} onPointerDown={(e) => e.stopPropagation()} style={{ flex: 'none', display: 'flex', marginTop: 1 }}>
+        {task.done ? (
+          <div style={{ width: 15, height: 15, borderRadius: '50%', background: COLORS.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+          </div>
+        ) : (
+          <GoalDot color={goal.dotColor} size={7} />
+        )}
+      </div>
+      <span style={{ minWidth: 0, lineHeight: 1.32, color: task.done ? COLORS.textDisabled : COLORS.taskTitle, textDecoration: task.done ? 'line-through' : 'none' }}>{task.title}</span>
+    </div>
+  )
+}
+
+function MiniCard({ task, goal, onMenu }: { task: Task; goal: Goal; onMenu: (e: React.MouseEvent) => void }): React.JSX.Element {
+  const { openEditor } = usePlanner()
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={() => openEditor(task.id)}
+      onContextMenu={onMenu}
+      style={{ opacity: isDragging ? 0.35 : 1 }}
+    >
+      <CardBody task={task} goal={goal} />
+    </div>
+  )
+}
+
+function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[]; onMenu: (t: Task) => (e: React.MouseEvent) => void }): React.JSX.Element {
+  const { goals, weekOffset, todayIndex, openNew, openDayInToday } = usePlanner()
+  const { setNodeRef, isOver } = useDroppable({ id: 'day-' + dayIndex })
+
+  const wm = weekModel(weekOffset)
+  const isToday = weekOffset === 0 && dayIndex === todayIndex
+  const isWeekend = dayIndex >= 5
+  const goalOf = (t: Task): Goal => goals.find((g) => g.id === t.goalId) || goals[0]
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 8, borderRadius: 14, padding: '12px 10px', minHeight: 440, transition: 'background .12s,border-color .12s',
+        background: isOver ? COLORS.accent12 : isToday ? COLORS.accent06 : isWeekend ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
+        border: isOver ? '1px dashed rgba(232,86,63,0.6)' : isToday ? `1.5px solid ${COLORS.accent}` : `1px solid ${COLORS.border}`,
+        boxShadow: isToday ? `0 0 0 1px ${COLORS.accent25}` : 'none'
+      }}
+    >
+      <div onClick={() => openDayInToday(dayIndex)} title="Открыть день" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: isToday ? COLORS.accent : isWeekend ? COLORS.textFaint : COLORS.textMuted }}>{DAY_SHORT[dayIndex]}</div>
+          {isToday && <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.4px', color: COLORS.accent, textTransform: 'uppercase' }}>сегодня</div>}
+        </div>
+        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 24, padding: '0 6px', borderRadius: 7, fontSize: 13, fontWeight: 700, background: isToday ? COLORS.accent : 'transparent', color: isToday ? '#fff' : COLORS.textPrimary }}>{wm.days[dayIndex].num}</div>
+      </div>
+
+      {/* Cap the list at ~8 rows; overflow scrolls within the column. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: tasks.length > MAX_VISIBLE ? MAX_VISIBLE * CARD_H : 'none', overflowY: tasks.length > MAX_VISIBLE ? 'auto' : 'visible', margin: tasks.length > MAX_VISIBLE ? '0 -4px' : 0, padding: tasks.length > MAX_VISIBLE ? '0 4px' : 0 }}>
+        {tasks.map((t) => <MiniCard key={t.id} task={t} goal={goalOf(t)} onMenu={onMenu(t)} />)}
+      </div>
+
+      <div onClick={() => openNew(null, dayIndex, weekOffset)} className="row-hover" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 9, cursor: 'pointer', color: COLORS.textFaint, fontSize: 11.5 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>
+        <span>Добавить задачу</span>
+      </div>
+    </div>
+  )
+}
+
+export function WeekView(): React.JSX.Element {
+  const { goals, tasks, weekOffset, todayIndex, shiftWeek, moveTask, deleteTask, selectGoal, deleteGoal } = usePlanner()
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [cal, setCal] = useState<{ x: number; y: number } | null>(null)
+  const menu = useContextMenu()
+
+  const cardMenu = (t: Task): ((e: React.MouseEvent) => void) => {
+    const items: MenuItem[] = [
+      { label: 'Изменить', onClick: () => usePlanner.getState().openEditor(t.id) },
+      { label: 'Удалить задачу', danger: true, onClick: () => deleteTask(t.id) }
+    ]
+    const g = goals.find((x) => x.id === t.goalId)
+    if (g) {
+      items.push({ label: 'Открыть цель', onClick: () => selectGoal(g.id) })
+      items.push({ label: `Удалить цель «${g.title}»`, danger: true, onClick: () => deleteGoal(g.id) })
+    }
+    return menu.open(items)
+  }
+
+  const onDragStart = (e: DragStartEvent): void => setDragId(String(e.active.id))
+  const onDragEnd = (e: DragEndEvent): void => {
+    setDragId(null)
+    const over = e.over?.id
+    if (typeof over === 'string' && over.startsWith('day-')) {
+      moveTask(String(e.active.id), Number(over.slice(4)))
+    }
+  }
+
+  const dragTask = dragId ? tasks.find((t) => t.id === dragId) : null
+  const dragGoal = dragTask ? goals.find((g) => g.id === dragTask.goalId) || goals[0] : null
+
+  const rangeDate = offsetToDate(weekOffset, 0)
+  const today = offsetToDate(0, todayIndex)
+  const pickWeek = (d: Date): void => {
+    const o = dateToOffset(d)
+    shiftWeek(o.weekOffset - weekOffset)
+    setCal(null)
+  }
+
+  const btn: React.CSSProperties = { width: 32, height: 32, borderRadius: 9, background: COLORS.rowBg, border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+        <button className="row-hover" onClick={() => shiftWeek(-1)} style={btn}>‹</button>
+        <div
+          onClick={(e) => setCal({ x: e.currentTarget.getBoundingClientRect().left, y: e.currentTarget.getBoundingClientRect().bottom })}
+          title="Открыть календарь"
+          style={{ minWidth: 150, textAlign: 'center', cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{weekModel(weekOffset).range}</div>
+          <div style={{ fontSize: 11.5, color: COLORS.textFaint, marginTop: 1 }}>{weekBadge(weekOffset)}</div>
+        </div>
+        <button className="row-hover" onClick={() => shiftWeek(1)} style={btn}>›</button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', color: COLORS.textFaint2, fontSize: 12 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 9l4 4 2-2 4 4 5-6" /></svg>
+          Перетащите задачу между днями
+        </div>
+      </div>
+
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 12 }}>
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+            <DayColumn key={i} dayIndex={i} tasks={tasks.filter((t) => t.day === i && (t.week || 0) === weekOffset)} onMenu={cardMenu} />
+          ))}
+        </div>
+        <DragOverlay dropAnimation={null}>
+          {dragTask && dragGoal ? (
+            <div style={{ width: 150 }}><CardBody task={dragTask} goal={dragGoal} dragging /></div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      <WeekAnalytics />
+      <WeekendIdeas />
+
+      {cal && (
+        <Calendar selected={rangeDate} today={today} weekMode anchor={cal} onPick={pickWeek} onClose={() => setCal(null)} />
+      )}
+      {menu.element}
+    </div>
+  )
+}

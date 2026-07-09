@@ -1,0 +1,87 @@
+import React, { useEffect } from 'react'
+import { usePlanner } from './store'
+import { Sidebar } from './components/Sidebar'
+import { ChatPanel } from './components/ChatPanel'
+import { ClaudeMark } from './components/primitives'
+import { TodayView } from './views/TodayView'
+import { WeekView } from './views/WeekView'
+import { GoalDetail } from './views/GoalDetail'
+import { ReviewView } from './views/ReviewView'
+import { TaskEditor } from './components/TaskEditor'
+import { COLORS } from './tokens'
+import { weekModel } from '@shared/dates'
+import { DAY_FULL } from '@shared/dates'
+
+const DAY_NUMS = ['6', '7', '8', '9', '10', '11', '12']
+
+function useHeader(): { title: string; sub: string } {
+  const { view, goals, activeGoalId, dayIndex, todayIndex, weekOffset } = usePlanner()
+  const ag = goals.find((g) => g.id === activeGoalId) || goals[0]
+  if (view === 'today') {
+    return {
+      title: dayIndex === todayIndex ? 'Сегодня' : DAY_FULL[dayIndex],
+      sub: `${DAY_FULL[dayIndex]}, ${DAY_NUMS[dayIndex]} июля`
+    }
+  }
+  if (view === 'week') return { title: 'Неделя', sub: weekModel(weekOffset).range }
+  if (view === 'review') return { title: 'Обзор', sub: 'Итоги недели' }
+  return { title: ag?.title ?? '', sub: ag?.category ?? '' }
+}
+
+export function App(): React.JSX.Element {
+  const { ready, hydrate, view, chatOpen, toggleChat, ed, sidebarCollapsed, toggleSidebar } = usePlanner()
+  const header = useHeader()
+
+  useEffect(() => { void hydrate() }, [hydrate])
+
+  if (!ready) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textFaint }}>
+        Загрузка…
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden' }}>
+      {!sidebarCollapsed && <Sidebar />}
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: COLORS.appBg }}>
+        <div style={{ height: 64, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 28px', borderBottom: `1px solid ${COLORS.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {sidebarCollapsed && (
+              <button
+                onClick={toggleSidebar}
+                title="Показать панель"
+                style={{ width: 32, height: 32, borderRadius: 9, background: COLORS.rowBg, border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="9" y1="4" x2="9" y2="20" /><path d="M13 9l2 3-2 3" /></svg>
+              </button>
+            )}
+            <div>
+              <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.3px' }}>{header.title}</div>
+              <div style={{ fontSize: 12.5, color: COLORS.textFaint, marginTop: 1 }}>{header.sub}</div>
+            </div>
+          </div>
+          <button
+            onClick={toggleChat}
+            style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 15px', borderRadius: 11, background: COLORS.accent13, border: `1px solid ${COLORS.accent30}`, color: COLORS.accent, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <ClaudeMark size={16} radius={5} />
+            Спросить Claude
+          </button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
+          {view === 'today' && <TodayView />}
+          {view === 'week' && <WeekView />}
+          {view === 'goal' && <GoalDetail />}
+          {view === 'review' && <ReviewView />}
+        </div>
+      </div>
+
+      {chatOpen && <ChatPanel />}
+      {ed && <TaskEditor />}
+    </div>
+  )
+}

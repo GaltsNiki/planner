@@ -1,0 +1,56 @@
+import { describe, it, expect } from 'vitest'
+import { extractTime, extractLink, linkify, byTime } from '../taskMeta'
+
+describe('extractTime', () => {
+  it('extracts an HH:MM token', () => {
+    expect(extractTime('Созвон в 19:00. Тема — small talk')).toBe('19:00')
+  })
+  it('pads a single-digit hour', () => {
+    expect(extractTime('Старт в 7:05, лёгкий темп')).toBe('07:05')
+  })
+  it('accepts a dot separator', () => {
+    expect(extractTime('В 21.30 растяжка')).toBe('21:30')
+  })
+  it('ignores times inside URLs', () => {
+    expect(extractTime('см https://x.io/12:00/route')).toBe('')
+  })
+  it('rejects out-of-range times', () => {
+    expect(extractTime('код 25:99')).toBe('')
+  })
+  it('returns empty when none present', () => {
+    expect(extractTime('Купить продукты')).toBe('')
+    expect(extractTime('')).toBe('')
+  })
+})
+
+describe('linkify / extractLink', () => {
+  it('finds a bare url and its label', () => {
+    const r = linkify('Маршрут https://www.strava.com/routes/3218764 по набережной')
+    expect(r.primary?.href).toBe('https://www.strava.com/routes/3218764')
+    expect(r.primary?.label).toBe('strava.com')
+    expect(r.textOnly).toBe('Маршрут по набережной')
+  })
+  it('adds https:// to www links', () => {
+    expect(extractLink('см www.ted.com/talks/x')?.href).toBe('https://www.ted.com/talks/x')
+  })
+  it('dedupes repeated urls', () => {
+    const r = linkify('a https://x.io b https://x.io')
+    expect(r.links).toHaveLength(1)
+  })
+  it('strips trailing punctuation', () => {
+    expect(extractLink('ссылка https://x.io/page).')?.href).toBe('https://x.io/page')
+  })
+  it('returns null primary with no url', () => {
+    expect(extractLink('без ссылок')).toBeNull()
+  })
+})
+
+describe('byTime', () => {
+  it('orders timed tasks earliest-first', () => {
+    const arr = [{ desc: 'в 19:00' }, { desc: 'в 07:00' }, { desc: 'без времени' }]
+    const sorted = [...arr].sort(byTime)
+    expect(sorted[0].desc).toBe('в 07:00')
+    expect(sorted[1].desc).toBe('в 19:00')
+    expect(sorted[2].desc).toBe('без времени')
+  })
+})
