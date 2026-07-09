@@ -12,7 +12,8 @@ const api: PlannerApi = {
     ipcRenderer.invoke(IPC.chat, input, activeGoal, tasks),
   breakDown: (title: string) => ipcRenderer.invoke(IPC.breakDown, title),
   review: (goals: Goal[], tasks: Task[]) => ipcRenderer.invoke(IPC.review, goals, tasks),
-  leisure: (seed: number) => ipcRenderer.invoke(IPC.leisure, seed),
+  leisure: (seed: number, location?: string, interests?: string[]) =>
+    ipcRenderer.invoke(IPC.leisure, seed, location, interests),
   hasKey: () => ipcRenderer.invoke(IPC.hasKey),
   setKey: (plain: string) => ipcRenderer.invoke(IPC.setKey, plain),
   clearKey: () => ipcRenderer.invoke(IPC.clearKey)

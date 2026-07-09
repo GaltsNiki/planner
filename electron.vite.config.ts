@@ -9,7 +9,10 @@ export default defineConfig({
     resolve: { alias: sharedAlias },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') }
+        input: { index: resolve(__dirname, 'src/main/index.ts') },
+        // Keep the Gemini SDK (and its ws/optional-native deps) out of the bundle;
+        // require it from node_modules at runtime instead of inlining it.
+        external: ['@google/genai']
       }
     }
   },

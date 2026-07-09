@@ -1,6 +1,10 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { registerIpc } from './ipc'
+import { loadEnv } from './services/env'
+
+// Load .env (GEMINI_API_KEY) before anything reads it.
+loadEnv()
 
 // App icon lives in build/ at the repo root (../../build relative to out/main).
 // .ico gives the crispest Windows taskbar/titlebar; PNG is the cross-platform fallback.

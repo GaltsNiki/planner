@@ -22,7 +22,7 @@ export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.E
     <div
       onClick={() => openEditor(task.id)}
       onContextMenu={menu.open([
-        { label: 'Изменить', onClick: () => openEditor(task.id) },
+        { label: 'Изменить задачу', onClick: () => openEditor(task.id) },
         { label: 'Удалить задачу', danger: true, onClick: () => deleteTask(task.id) }
       ])}
       className="row-hover"

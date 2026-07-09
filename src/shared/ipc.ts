@@ -6,11 +6,11 @@ export interface PlannerApi {
   loadData(): Promise<PlannerData>
   saveData(data: PlannerData): Promise<void>
 
-  // Mock AI
+  // AI (Gemini, with mock fallback)
   chat(input: string, activeGoal: Goal, tasks: Task[]): Promise<string>
   breakDown(title: string): Promise<string>
   review(goals: Goal[], tasks: Task[]): Promise<string>
-  leisure(seed: number): Promise<LeisureSuggestion[]>
+  leisure(seed: number, location?: string, interests?: string[]): Promise<LeisureSuggestion[]>
 
   // API key
   hasKey(): Promise<boolean>

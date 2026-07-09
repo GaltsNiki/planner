@@ -9,8 +9,14 @@ function keyPath(): string {
   return join(app.getPath('userData'), 'api-key.bin')
 }
 
-export function hasKey(): boolean {
+/** Whether the stored keychain file exists (not counting the env fallback). */
+function hasStoredKey(): boolean {
   return existsSync(keyPath())
+}
+
+/** True if a key is available from either the keychain or the env var. */
+export function hasKey(): boolean {
+  return hasStoredKey() || !!process.env.GEMINI_API_KEY
 }
 
 export function setKey(plain: string): void {
@@ -24,17 +30,24 @@ export function setKey(plain: string): void {
   writeFileSync(keyPath(), enc)
 }
 
-/** For main-process use only — never expose the plaintext over IPC. */
+/**
+ * For main-process use only — never expose the plaintext over IPC.
+ * Resolution order: OS-encrypted keychain file, then the GEMINI_API_KEY env var
+ * (loaded from .env). This lets a .env key work without a Settings screen.
+ */
 export function getKey(): string | null {
-  if (!hasKey()) return null
-  const buf = readFileSync(keyPath())
-  try {
-    return safeStorage.isEncryptionAvailable()
-      ? safeStorage.decryptString(buf)
-      : buf.toString('utf-8')
-  } catch {
-    return null
+  if (hasStoredKey()) {
+    const buf = readFileSync(keyPath())
+    try {
+      const k = safeStorage.isEncryptionAvailable()
+        ? safeStorage.decryptString(buf)
+        : buf.toString('utf-8')
+      if (k) return k
+    } catch {
+      // fall through to env
+    }
   }
+  return process.env.GEMINI_API_KEY || null
 }
 
 export function clearKey(): void {

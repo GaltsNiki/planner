@@ -48,20 +48,27 @@ function SuggestionCard({ s }: { s: LeisureSuggestion }): React.JSX.Element {
 }
 
 export function WeekendIdeas(): React.JSX.Element {
-  const { leisureSeed, leisureLoading, refreshLeisure, settings } = usePlanner()
+  const { leisureSeed, refreshLeisure, settings } = usePlanner()
   const [items, setItems] = useState<LeisureSuggestion[]>([])
+  const [leisureLoading, setLeisureLoading] = useState(false)
 
-  // Fetch the current set from the (mock) service whenever the seed changes.
+  const interests = settings.interests?.join(', ') || 'театр, природа, музыка, кофе'
+  const location = settings.location || 'Санкт-Петербург'
+
+  // Fetch suggestions (Gemini w/ search, or mock) whenever the seed changes.
   useEffect(() => {
     let active = true
-    void window.planner.leisure(leisureSeed).then((res) => { if (active) setItems(res) })
+    setLeisureLoading(true)
+    void window.planner
+      .leisure(leisureSeed, settings.location, settings.interests)
+      .then((res) => { if (active) setItems(res) })
+      .finally(() => { if (active) setLeisureLoading(false) })
     return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leisureSeed])
 
   const sat = items.filter((s) => s.day === 5)
   const sun = items.filter((s) => s.day === 6)
-  const interests = settings.interests?.join(', ') || 'театр, природа, музыка, кофе'
-  const location = settings.location || 'Санкт-Петербург'
 
   return (
     <div style={{ background: 'linear-gradient(180deg,rgba(232,86,63,0.05),rgba(255,255,255,0.02))', border: `1px solid ${COLORS.border06}`, borderRadius: 16, padding: '20px 22px', marginTop: 16 }}>

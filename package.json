@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
+    "@google/genai": "^2.10.0",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

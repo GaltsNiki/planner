@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
-  type DragEndEvent, type DragStartEvent
+  closestCenter, type DragEndEvent, type DragStartEvent
 } from '@dnd-kit/core'
 import { usePlanner } from '../store'
 import { GoalDot } from '../components/primitives'
@@ -77,14 +77,24 @@ function CardBody({ task, goal, dragging, handleProps, onToggle, onOpen }: CardB
 
 function MiniCard({ task, goal, onMenu }: { task: Task; goal: Goal; onMenu: (e: React.MouseEvent) => void }): React.JSX.Element {
   const { openEditor, toggleTask } = usePlanner()
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: task.id })
+  // Also a drop target so tasks can be reordered within a day (drop = insert before).
+  const { setNodeRef: setDropRef, isOver, active } = useDroppable({ id: 'task-' + task.id })
+  const showIndicator = isOver && active?.id !== task.id
+
+  const setRefs = (node: HTMLElement | null): void => { setDragRef(node); setDropRef(node) }
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setRefs}
       onContextMenu={onMenu}
       className="row-hover"
-      style={{ borderRadius: 9, opacity: isDragging ? 0.35 : 1 }}
+      style={{
+        borderRadius: 9,
+        opacity: isDragging ? 0.35 : 1,
+        // Insertion line above the card that the drag is hovering over.
+        boxShadow: showIndicator ? `inset 0 2px 0 ${COLORS.accent}` : 'none'
+      }}
     >
       <CardBody
         task={task}
@@ -112,8 +122,8 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
       style={{
         display: 'flex', flexDirection: 'column', gap: 8, borderRadius: 14, padding: '12px 10px', minHeight: 440, transition: 'background .12s,border-color .12s',
         background: isOver ? COLORS.accent12 : isToday ? COLORS.accent06 : isWeekend ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
-        border: isOver ? '1px dashed rgba(232,86,63,0.6)' : isToday ? `1.5px solid ${COLORS.accent}` : `1px solid ${COLORS.border}`,
-        boxShadow: isToday ? `0 0 0 1px ${COLORS.accent25}` : 'none'
+        border: isOver ? '1px dashed rgba(232,86,63,0.6)' : isToday ? `1px solid ${COLORS.accent18}` : `1px solid ${COLORS.border}`,
+        boxShadow: isToday ? `0 6px 26px rgba(232,86,63,0.06)` : 'none'
       }}
     >
       <div onClick={() => openDayInToday(dayIndex)} title="Открыть день" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, cursor: 'pointer' }}>
@@ -138,7 +148,7 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
 }
 
 export function WeekView(): React.JSX.Element {
-  const { goals, tasks, weekOffset, todayIndex, shiftWeek, moveTask, deleteTask, selectGoal, deleteGoal } = usePlanner()
+  const { goals, tasks, weekOffset, todayIndex, shiftWeek, moveTask, reorderTask, deleteTask, selectGoal, deleteGoal } = usePlanner()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const [dragId, setDragId] = useState<string | null>(null)
   const [cal, setCal] = useState<{ x: number; y: number } | null>(null)
@@ -161,9 +171,14 @@ export function WeekView(): React.JSX.Element {
   const onDragStart = (e: DragStartEvent): void => setDragId(String(e.active.id))
   const onDragEnd = (e: DragEndEvent): void => {
     setDragId(null)
+    const active = String(e.active.id)
     const over = e.over?.id
-    if (typeof over === 'string' && over.startsWith('day-')) {
-      moveTask(String(e.active.id), Number(over.slice(4)))
+    if (typeof over !== 'string') return
+    // Dropped on a card → reorder within (or across) days; on empty column → move to that day.
+    if (over.startsWith('task-')) {
+      reorderTask(active, over.slice(5))
+    } else if (over.startsWith('day-')) {
+      moveTask(active, Number(over.slice(4)))
     }
   }
 
@@ -195,11 +210,11 @@ export function WeekView(): React.JSX.Element {
         <button className="row-hover" onClick={() => shiftWeek(1)} style={btn}>›</button>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', color: COLORS.textFaint2, fontSize: 12 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 9l4 4 2-2 4 4 5-6" /></svg>
-          Перетащите задачу между днями
+          Перетащите задачу между днями или измените порядок внутри дня
         </div>
       </div>
 
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 12 }}>
           {[0, 1, 2, 3, 4, 5, 6].map((i) => (
             <DayColumn key={i} dayIndex={i} tasks={tasks.filter((t) => t.day === i && (t.week || 0) === weekOffset)} onMenu={cardMenu} />

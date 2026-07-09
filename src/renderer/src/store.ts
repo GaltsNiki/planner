@@ -87,6 +87,8 @@ interface PlannerState {
   deleteTask: (id: string) => void
   deleteGoal: (id: string) => void
   moveTask: (id: string, day: number) => void
+  /** Reorder a task to sit just before `beforeId`, adopting that task's day/week. */
+  reorderTask: (id: string, beforeId: string) => void
   setDragOverDay: (day: number | null) => void
 
   // Task editor
@@ -195,6 +197,24 @@ export const usePlanner = create<PlannerState>((set, get) => {
     },
     moveTask: (id, day) => {
       set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, day } : t)) }))
+      persist()
+    },
+    reorderTask: (id, beforeId) => {
+      if (id === beforeId) return
+      set((s) => {
+        const arr = s.tasks.slice()
+        const from = arr.findIndex((t) => t.id === id)
+        const target = arr.find((t) => t.id === beforeId)
+        if (from < 0 || !target) return {}
+        const [moved] = arr.splice(from, 1)
+        // Adopt the drop target's day/week so cross-day drops land correctly.
+        moved.day = target.day
+        moved.week = target.week || 0
+        // Recompute the index after removal, then insert just before the target.
+        const to = arr.findIndex((t) => t.id === beforeId)
+        arr.splice(to, 0, moved)
+        return { tasks: arr }
+      })
       persist()
     },
     setDragOverDay: (day) => set({ dragOverDay: day }),
@@ -400,10 +420,8 @@ export const usePlanner = create<PlannerState>((set, get) => {
     },
 
     refreshLeisure: async () => {
-      set({ leisureLoading: true })
-      // The seed drives which set the mock returns; bump after the "search".
-      await window.planner.leisure(get().leisureSeed + 1)
-      set((s) => ({ leisureLoading: false, leisureSeed: s.leisureSeed + 1, added: {}, addedTaskIds: {} }))
+      // Bump the seed; WeekendIdeas re-fetches (with its own loading state) on change.
+      set((s) => ({ leisureSeed: s.leisureSeed + 1, added: {}, addedTaskIds: {} }))
     },
     addSuggestion: (sug) => {
       const s = get()

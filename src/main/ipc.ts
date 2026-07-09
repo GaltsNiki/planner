@@ -17,7 +17,9 @@ export function registerIpc(): void {
   )
   ipcMain.handle(IPC.breakDown, (_e, title: string) => ai.breakDown(title))
   ipcMain.handle(IPC.review, (_e, goals: Goal[], tasks: Task[]) => ai.review(goals, tasks))
-  ipcMain.handle(IPC.leisure, (_e, seed: number) => ai.leisure(seed))
+  ipcMain.handle(IPC.leisure, (_e, seed: number, location?: string, interests?: string[]) =>
+    ai.leisure(seed, location, interests)
+  )
 
   ipcMain.handle(IPC.hasKey, () => hasKey())
   ipcMain.handle(IPC.setKey, (_e, plain: string) => setKey(plain))
