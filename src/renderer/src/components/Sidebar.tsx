@@ -26,7 +26,7 @@ function NavItem({
 }
 
 export function Sidebar(): React.JSX.Element {
-  const { goals, tasks, view, activeGoalId, setView, selectGoal, deleteGoal, toggleSidebar } = usePlanner()
+  const { goals, tasks, view, activeGoalId, setView, selectGoal, deleteGoal, openNewGoal, openEditGoal, toggleSidebar } = usePlanner()
 
   const icons: Record<Exclude<View, 'goal'>, React.JSX.Element> = {
     today: (
@@ -73,7 +73,17 @@ export function Sidebar(): React.JSX.Element {
         <NavItem active={view === 'review'} label="Обзор" onClick={() => setView('review')} icon={icons.review} />
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled, margin: '22px 8px 8px' }}>МОИ ЦЕЛИ</div>
+      <div style={{ display: 'flex', alignItems: 'center', margin: '22px 8px 8px' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled }}>МОИ ЦЕЛИ</div>
+        <button
+          onClick={openNewGoal}
+          title="Новая цель"
+          className="row-hover"
+          style={{ marginLeft: 'auto', width: 22, height: 22, borderRadius: 6, background: 'transparent', border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
+        </button>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
         {goals.map((g) => {
           const st = goalStats(g, tasks)
@@ -84,6 +94,7 @@ export function Sidebar(): React.JSX.Element {
               onClick={() => selectGoal(g.id)}
               onContextMenu={menu.open([
                 { label: 'Открыть цель', onClick: () => selectGoal(g.id) },
+                { label: 'Изменить цель', onClick: () => openEditGoal(g.id) },
                 { label: 'Удалить цель', danger: true, onClick: () => deleteGoal(g.id) }
               ])}
               style={{ padding: '9px 10px', borderRadius: 10, cursor: 'pointer', background: active ? 'rgba(255,255,255,0.05)' : 'transparent' }}

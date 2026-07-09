@@ -43,3 +43,6 @@ input, textarea { font-family: inherit; }
 .hoverable { transition: background .12s; }
 .row-hover:hover { background: #1e1e22 !important; }
 .card-hover:hover { background: #17171a !important; }
+
+/* Week mini-card zones */
+.mini-open:hover { text-decoration: underline; text-underline-offset: 2px; }

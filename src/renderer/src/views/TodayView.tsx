@@ -59,7 +59,7 @@ function DateNavigator(): React.JSX.Element {
 }
 
 export function TodayView(): React.JSX.Element {
-  const { goals, tasks, stale, dayIndex, weekOffset, selectGoal, deleteGoal, openNew, breakDown } = usePlanner()
+  const { goals, tasks, stale, dayIndex, weekOffset, selectGoal, deleteGoal, openEditGoal, openNew, breakDown } = usePlanner()
   const menu = useContextMenu()
 
   const todayTasks = tasks.filter((t) => t.day === dayIndex && (t.week || 0) === weekOffset)
@@ -98,6 +98,7 @@ export function TodayView(): React.JSX.Element {
             onClick={() => selectGoal(g.id)}
             onContextMenu={menu.open([
               { label: 'Открыть цель', onClick: () => selectGoal(g.id) },
+              { label: 'Изменить цель', onClick: () => openEditGoal(g.id) },
               { label: 'Удалить цель', danger: true, onClick: () => deleteGoal(g.id) }
             ])}
             style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 0 12px 2px', cursor: 'pointer' }}

@@ -17,15 +17,34 @@ import type { Task, Goal } from '@shared/types'
 const MAX_VISIBLE = 8
 const CARD_H = 40 // approx card height incl. gap, for the scroll cap
 
-/** The visual card body — shared by the in-column card and the drag overlay. */
-function CardBody({ task, goal, dragging }: { task: Task; goal: Goal; dragging?: boolean }): React.JSX.Element {
-  const { toggleTask } = usePlanner()
+interface CardBodyProps {
+  task: Task
+  goal: Goal
+  dragging?: boolean
+  /** Drag listeners/attributes applied to the right-corner handle only. */
+  handleProps?: React.HTMLAttributes<HTMLElement>
+  onToggle?: () => void
+  onOpen?: () => void
+}
+
+/**
+ * The mini-card. Three zones:
+ *   left corner  → toggle done
+ *   center       → open the task
+ *   right corner → drag handle (grip)
+ * Shared by the in-column card and the drag overlay.
+ */
+function CardBody({ task, goal, dragging, handleProps, onToggle, onOpen }: CardBodyProps): React.JSX.Element {
   return (
     <div
-      className={dragging ? undefined : 'row-hover'}
-      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 9px', background: dragging ? '#26262b' : 'rgba(255,255,255,0.03)', border: `1px solid ${dragging ? COLORS.accent30 : COLORS.border06}`, borderRadius: 9, cursor: dragging ? 'grabbing' : 'grab', fontSize: 12, boxShadow: dragging ? '0 8px 22px rgba(0,0,0,0.45)' : 'none' }}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 5px 7px 8px', background: dragging ? '#26262b' : 'rgba(255,255,255,0.03)', border: `1px solid ${dragging ? COLORS.accent30 : COLORS.border06}`, borderRadius: 9, fontSize: 12, boxShadow: dragging ? '0 8px 22px rgba(0,0,0,0.45)' : 'none' }}
     >
-      <div onClick={(e) => { e.stopPropagation(); toggleTask(task.id) }} onPointerDown={(e) => e.stopPropagation()} style={{ flex: 'none', display: 'flex', marginTop: 1 }}>
+      {/* LEFT — toggle done */}
+      <div
+        onClick={(e) => { e.stopPropagation(); onToggle?.() }}
+        title={task.done ? 'Отметить невыполненной' : 'Отметить выполненной'}
+        style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 22, cursor: onToggle ? 'pointer' : 'default', marginTop: 1 }}
+      >
         {task.done ? (
           <div style={{ width: 15, height: 15, borderRadius: '50%', background: COLORS.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
@@ -34,25 +53,46 @@ function CardBody({ task, goal, dragging }: { task: Task; goal: Goal; dragging?:
           <GoalDot color={goal.dotColor} size={7} />
         )}
       </div>
-      <span style={{ minWidth: 0, lineHeight: 1.32, color: task.done ? COLORS.textDisabled : COLORS.taskTitle, textDecoration: task.done ? 'line-through' : 'none' }}>{task.title}</span>
+
+      {/* CENTER — open editor */}
+      <span
+        onClick={(e) => { e.stopPropagation(); onOpen?.() }}
+        className={onOpen ? 'mini-open' : undefined}
+        style={{ flex: 1, minWidth: 0, lineHeight: 1.32, cursor: onOpen ? 'pointer' : 'default', color: task.done ? COLORS.textDisabled : COLORS.taskTitle, textDecoration: task.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+      >
+        {task.title}
+      </span>
+
+      {/* RIGHT — drag handle */}
+      <div
+        {...handleProps}
+        title="Перетащите, чтобы перенести"
+        style={{ flex: 'none', alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, borderRadius: 6, color: COLORS.textFaint2, cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none' }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" /><circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" /></svg>
+      </div>
     </div>
   )
 }
 
 function MiniCard({ task, goal, onMenu }: { task: Task; goal: Goal; onMenu: (e: React.MouseEvent) => void }): React.JSX.Element {
-  const { openEditor } = usePlanner()
+  const { openEditor, toggleTask } = usePlanner()
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
 
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
-      onClick={() => openEditor(task.id)}
       onContextMenu={onMenu}
-      style={{ opacity: isDragging ? 0.35 : 1 }}
+      className="row-hover"
+      style={{ borderRadius: 9, opacity: isDragging ? 0.35 : 1 }}
     >
-      <CardBody task={task} goal={goal} />
+      <CardBody
+        task={task}
+        goal={goal}
+        handleProps={{ ...attributes, ...listeners }}
+        onToggle={() => toggleTask(task.id)}
+        onOpen={() => openEditor(task.id)}
+      />
     </div>
   )
 }
@@ -112,6 +152,7 @@ export function WeekView(): React.JSX.Element {
     const g = goals.find((x) => x.id === t.goalId)
     if (g) {
       items.push({ label: 'Открыть цель', onClick: () => selectGoal(g.id) })
+      items.push({ label: 'Изменить цель', onClick: () => usePlanner.getState().openEditGoal(g.id) })
       items.push({ label: `Удалить цель «${g.title}»`, danger: true, onClick: () => deleteGoal(g.id) })
     }
     return menu.open(items)

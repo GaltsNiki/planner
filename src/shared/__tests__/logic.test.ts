@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { stepSegments } from '../closeness'
+import { stepSegments, deriveClosenessLabel } from '../closeness'
 import { staleRows, isStale } from '../staleness'
 import { chatReply, breakDownReply, leisureSuggestions, weeklyReview } from '../mockAI'
 import { seedData } from '../seed'
@@ -21,6 +21,21 @@ describe('stepSegments', () => {
     expect(s[0].color).toBe('#E8563F')
     expect(s[1].color).toBe('rgba(232,86,63,0.5)')
     expect(s[2].muted).toBe(true)
+  })
+})
+
+describe('deriveClosenessLabel', () => {
+  const ms = (statuses: ('done' | 'active' | 'todo')[]): { status: 'done' | 'active' | 'todo' }[] =>
+    statuses.map((status) => ({ status }))
+  it('handles the empty and just-started cases', () => {
+    expect(deriveClosenessLabel([])).toBe('Цель только поставлена')
+    expect(deriveClosenessLabel(ms(['todo', 'todo', 'todo']))).toBe('В начале пути')
+  })
+  it('scales with completion', () => {
+    expect(deriveClosenessLabel(ms(['done', 'active', 'todo']))).toBe('Первые шаги сделаны') // 1/3 ≈ 0.33
+    expect(deriveClosenessLabel(ms(['done', 'done', 'todo', 'todo']))).toBe('Примерно на полпути') // 2/4 = 0.5
+    expect(deriveClosenessLabel(ms(['done', 'done', 'done', 'todo']))).toBe('На финишной прямой') // 3/4 = 0.75
+    expect(deriveClosenessLabel(ms(['done', 'done']))).toBe('Цель достигнута') // 2/2 = 1
   })
 })
 

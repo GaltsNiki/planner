@@ -19,6 +19,14 @@ export interface Goal {
   milestones: Milestone[]
   closenessLabel: string
   claudeTake: string
+  /**
+   * SMART goal criteria (optional so pre-existing goals stay valid).
+   * S = the title itself (Specific). These cover the rest:
+   */
+  measurable?: string  // M — how success is measured
+  achievable?: string  // A — why it's realistic / resources
+  relevant?: string    // R — why it matters
+  deadline?: string     // T — target date (ISO yyyy-mm-dd) or free text
 }
 
 export interface Task {

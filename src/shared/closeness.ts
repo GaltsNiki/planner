@@ -29,3 +29,19 @@ export function stepSegments(goal: Goal): StepSegment[] {
 export function closenessLabel(goal: Goal): string {
   return goal.closenessLabel
 }
+
+/**
+ * Derive a closeness label from milestone completion — used for goals created
+ * in-app (which have no hand-authored label).
+ */
+export function deriveClosenessLabel(milestones: { status: MilestoneStatus }[]): string {
+  const total = milestones.length
+  if (!total) return 'Цель только поставлена'
+  const done = milestones.filter((m) => m.status === 'done').length
+  const pct = done / total
+  if (pct === 0) return 'В начале пути'
+  if (pct < 0.34) return 'Первые шаги сделаны'
+  if (pct < 0.67) return 'Примерно на полпути'
+  if (pct < 1) return 'На финишной прямой'
+  return 'Цель достигнута'
+}

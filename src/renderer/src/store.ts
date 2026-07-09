@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import type {
-  Goal, Task, StaleTask, ChatMap, Settings, View, PlannerData
+  Goal, Task, StaleTask, ChatMap, Settings, View, PlannerData, Milestone, MilestoneStatus
 } from '@shared/types'
 import { todayDayIndex } from '@shared/dates'
+import { deriveClosenessLabel } from '@shared/closeness'
 
 export interface EditorDraft {
   isNew: boolean
@@ -15,6 +16,30 @@ export interface EditorDraft {
   week: number
   done: boolean
 }
+
+/** Working copy for the SMART goal editor (create + edit). */
+export interface GoalDraft {
+  isNew: boolean
+  id: string | null
+  title: string        // S — Specific
+  category: string
+  dotColor: string
+  measurable: string   // M
+  achievable: string   // A
+  relevant: string     // R
+  deadline: string     // T (ISO date or free text)
+  milestones: Milestone[]
+}
+
+/** Accent palette offered in the goal editor. */
+export const GOAL_COLORS = [
+  '#E8563F',
+  'oklch(0.7 0.13 250)',
+  'oklch(0.72 0.15 150)',
+  'oklch(0.7 0.13 300)',
+  'oklch(0.75 0.14 90)',
+  'oklch(0.68 0.15 20)'
+]
 
 interface PlannerState {
   // Persisted domain data
@@ -32,6 +57,7 @@ interface PlannerState {
   chatOpen: boolean
   draft: string
   ed: EditorDraft | null
+  goalEd: GoalDraft | null
   dragOverDay: number | null
   leisureSeed: number
   leisureLoading: boolean
@@ -63,7 +89,7 @@ interface PlannerState {
   moveTask: (id: string, day: number) => void
   setDragOverDay: (day: number | null) => void
 
-  // Editor
+  // Task editor
   openNew: (goalId: string | null, day: number | null, week: number | null) => void
   openEditor: (id: string) => void
   edField: <K extends keyof EditorDraft>(k: K, v: EditorDraft[K]) => void
@@ -71,6 +97,18 @@ interface PlannerState {
   saveEd: () => void
   deleteEd: () => void
   closeEd: () => void
+
+  // Goal editor (SMART)
+  openNewGoal: () => void
+  openEditGoal: (id: string) => void
+  goalEdField: <K extends keyof GoalDraft>(k: K, v: GoalDraft[K]) => void
+  goalEdAddMilestone: () => void
+  goalEdUpdateMilestone: (mId: string, patch: Partial<Milestone>) => void
+  goalEdRemoveMilestone: (mId: string) => void
+  goalEdMoveMilestone: (mId: string, dir: -1 | 1) => void
+  saveGoalEd: () => void
+  deleteGoalEd: () => void
+  closeGoalEd: () => void
 
   // Chat / AI
   setDraft: (v: string) => void
@@ -106,7 +144,7 @@ export const usePlanner = create<PlannerState>((set, get) => {
   return {
     goals: [], tasks: [], stale: [], chats: {}, settings: {},
     view: 'today', activeGoalId: 'g1', dayIndex: todayDayIndex(), weekOffset: 0,
-    chatOpen: true, draft: '', ed: null, dragOverDay: null,
+    chatOpen: true, draft: '', ed: null, goalEd: null, dragOverDay: null,
     leisureSeed: 0, leisureLoading: false, added: {}, addedTaskIds: {},
     sidebarCollapsed: false, ready: false, todayIndex: todayDayIndex(),
 
@@ -164,10 +202,11 @@ export const usePlanner = create<PlannerState>((set, get) => {
     openNew: (goalId, day, week) => {
       const s = get()
       const g = s.goals.find((x) => x.id === goalId) || s.goals[0]
-      const am = g.milestones.find((m) => m.status === 'active') || g.milestones[0]
+      // A goal may have no milestones yet — mId is then empty, which is valid.
+      const am = g?.milestones.find((m) => m.status === 'active') || g?.milestones[0]
       set({
         ed: {
-          isNew: true, id: null, goalId: g.id, mId: am.id, title: '', desc: '',
+          isNew: true, id: null, goalId: g?.id ?? '', mId: am?.id ?? '', title: '', desc: '',
           day: day == null ? s.todayIndex : day, week: week == null ? 0 : week, done: false
         }
       })
@@ -186,8 +225,9 @@ export const usePlanner = create<PlannerState>((set, get) => {
     edPickGoal: (id) => {
       const g = get().goals.find((x) => x.id === id)
       if (!g) return
+      // Empty milestone id is fine for a goal without milestones.
       const am = g.milestones.find((m) => m.status === 'active') || g.milestones[0]
-      set((s) => (s.ed ? { ed: { ...s.ed, goalId: id, mId: am.id } } : {}))
+      set((s) => (s.ed ? { ed: { ...s.ed, goalId: id, mId: am?.id ?? '' } } : {}))
     },
     saveEd: () => {
       const ed = get().ed
@@ -219,6 +259,114 @@ export const usePlanner = create<PlannerState>((set, get) => {
       persist()
     },
     closeEd: () => set({ ed: null }),
+
+    openNewGoal: () =>
+      set({
+        goalEd: {
+          isNew: true, id: null, title: '', category: '', dotColor: GOAL_COLORS[0],
+          measurable: '', achievable: '', relevant: '', deadline: '',
+          milestones: []
+        }
+      }),
+    openEditGoal: (id) => {
+      const g = get().goals.find((x) => x.id === id)
+      if (!g) return
+      set({
+        goalEd: {
+          isNew: false, id: g.id, title: g.title, category: g.category, dotColor: g.dotColor,
+          measurable: g.measurable || '', achievable: g.achievable || '',
+          relevant: g.relevant || '', deadline: g.deadline || '',
+          // Clone milestones so edits stay in the draft until saved.
+          milestones: g.milestones.map((m) => ({ ...m }))
+        }
+      })
+    },
+    goalEdField: (k, v) => set((s) => (s.goalEd ? { goalEd: { ...s.goalEd, [k]: v } } : {})),
+    goalEdAddMilestone: () =>
+      set((s) =>
+        s.goalEd
+          ? {
+              goalEd: {
+                ...s.goalEd,
+                milestones: [
+                  ...s.goalEd.milestones,
+                  { id: 'm' + Date.now() + Math.floor(Math.random() * 1000), title: '', status: 'todo' as MilestoneStatus }
+                ]
+              }
+            }
+          : {}
+      ),
+    goalEdUpdateMilestone: (mId, patch) =>
+      set((s) =>
+        s.goalEd
+          ? { goalEd: { ...s.goalEd, milestones: s.goalEd.milestones.map((m) => (m.id === mId ? { ...m, ...patch } : m)) } }
+          : {}
+      ),
+    goalEdRemoveMilestone: (mId) =>
+      set((s) =>
+        s.goalEd
+          ? { goalEd: { ...s.goalEd, milestones: s.goalEd.milestones.filter((m) => m.id !== mId) } }
+          : {}
+      ),
+    goalEdMoveMilestone: (mId, dir) =>
+      set((s) => {
+        if (!s.goalEd) return {}
+        const ms = s.goalEd.milestones.slice()
+        const i = ms.findIndex((m) => m.id === mId)
+        const j = i + dir
+        if (i < 0 || j < 0 || j >= ms.length) return {}
+        ;[ms[i], ms[j]] = [ms[j], ms[i]]
+        return { goalEd: { ...s.goalEd, milestones: ms } }
+      }),
+    saveGoalEd: () => {
+      const gd = get().goalEd
+      if (!gd) return
+      const title = gd.title.trim()
+      if (!title) return
+      // Keep only milestones with a title; ensure at least one is active.
+      const milestones = gd.milestones
+        .map((m) => ({ ...m, title: m.title.trim() }))
+        .filter((m) => m.title)
+      if (milestones.length && !milestones.some((m) => m.status === 'active') && !milestones.every((m) => m.status === 'done')) {
+        const firstTodo = milestones.find((m) => m.status === 'todo')
+        if (firstTodo) firstTodo.status = 'active'
+      }
+      const common = {
+        title,
+        category: gd.category.trim() || 'Цель',
+        dotColor: gd.dotColor,
+        milestones,
+        measurable: gd.measurable.trim() || undefined,
+        achievable: gd.achievable.trim() || undefined,
+        relevant: gd.relevant.trim() || undefined,
+        deadline: gd.deadline.trim() || undefined,
+        closenessLabel: deriveClosenessLabel(milestones)
+      }
+      if (gd.isNew) {
+        const id = 'g' + Date.now()
+        const goal: Goal = {
+          id,
+          ...common,
+          claudeTake: gd.relevant.trim()
+            ? `Почему это важно: ${gd.relevant.trim()} Разбей цель на первые конкретные шаги — и начнём двигаться.`
+            : 'Новая цель поставлена. Разбей её на первые конкретные шаги, чтобы начать двигаться.'
+        }
+        set((s) => ({ goals: [...s.goals, goal], goalEd: null, view: 'goal', activeGoalId: id }))
+      } else {
+        set((s) => ({
+          goals: s.goals.map((g) => (g.id === gd.id ? { ...g, ...common } : g)),
+          goalEd: null
+        }))
+      }
+      persist()
+    },
+    deleteGoalEd: () => {
+      const gd = get().goalEd
+      if (!gd || gd.isNew || !gd.id) { set({ goalEd: null }); return }
+      get().deleteGoal(gd.id)
+      set({ goalEd: null })
+    },
+    closeGoalEd: () => set({ goalEd: null }),
 
     setDraft: (v) => set({ draft: v }),
     send: async (text) => {

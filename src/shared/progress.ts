@@ -13,9 +13,27 @@ export interface GoalStats {
 export function goalStats(goal: Goal, tasks: Task[]): GoalStats {
   const ts = tasks.filter((t) => t.goalId === goal.id)
   const done = ts.filter((t) => t.done).length
-  const pct = ts.length ? Math.round((done / ts.length) * 100) : 0
   const mDone = goal.milestones.filter((m) => m.status === 'done').length
-  return { done, total: ts.length, pct, mDone, mTotal: goal.milestones.length }
+  const mTotal = goal.milestones.length
+
+  // Goal progress tracks the goal's stages (milestones). A finished stage
+  // counts even with no tasks. The active stage contributes a partial amount
+  // from its own task completion so the ring isn't static between stages.
+  let pct: number
+  if (mTotal) {
+    const active = goal.milestones.find((m) => m.status === 'active')
+    let activeShare = 0
+    if (active) {
+      const mts = ts.filter((t) => t.mId === active.id)
+      activeShare = mts.length ? mts.filter((t) => t.done).length / mts.length : 0
+    }
+    pct = Math.round(((mDone + activeShare) / mTotal) * 100)
+  } else {
+    // No stages defined — fall back to plain task completion.
+    pct = ts.length ? Math.round((done / ts.length) * 100) : 0
+  }
+
+  return { done, total: ts.length, pct, mDone, mTotal }
 }
 
 /** Percentage of tasks done among a set. */

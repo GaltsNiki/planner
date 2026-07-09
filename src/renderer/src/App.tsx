@@ -8,6 +8,7 @@ import { WeekView } from './views/WeekView'
 import { GoalDetail } from './views/GoalDetail'
 import { ReviewView } from './views/ReviewView'
 import { TaskEditor } from './components/TaskEditor'
+import { GoalEditor } from './components/GoalEditor'
 import { COLORS } from './tokens'
 import { weekModel, offsetToDate, DAY_FULL } from '@shared/dates'
 import { fmtDay } from './components/Calendar'
@@ -80,6 +81,7 @@ export function App(): React.JSX.Element {
 
       {chatOpen && <ChatPanel />}
       {ed && <TaskEditor />}
+      <GoalEditor />
     </div>
   )
 }

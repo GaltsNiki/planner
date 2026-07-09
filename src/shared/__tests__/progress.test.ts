@@ -18,13 +18,31 @@ const mk = (over: Partial<Task>): Task => ({
 })
 
 describe('goalStats', () => {
-  it('computes done/total/pct and milestone counts', () => {
+  // goal has milestones m1=done, m2=active, m3=todo
+  it('tracks task counts but derives pct from milestone stages', () => {
+    // 4 tasks all on m1; m2 (active) has none → activeShare 0 → 1 of 3 stages = 33%.
     const tasks = [mk({ done: true }), mk({ done: true }), mk({ done: false }), mk({ done: false })]
     const s = goalStats(goal, tasks)
-    expect(s).toMatchObject({ done: 2, total: 4, pct: 50, mDone: 1, mTotal: 3 })
+    expect(s).toMatchObject({ done: 2, total: 4, pct: 33, mDone: 1, mTotal: 3 })
   })
-  it('is 0% with no tasks', () => {
-    expect(goalStats(goal, []).pct).toBe(0)
+
+  it('shows progress from a finished stage even with no tasks (the reported bug)', () => {
+    expect(goalStats(goal, []).pct).toBe(33) // 1 of 3 stages done
+  })
+
+  it('adds a partial share for the active stage from its own tasks', () => {
+    // m2 is active; give it 4 tasks, 2 done → activeShare 0.5 → (1 + 0.5)/3 = 50%.
+    const tasks = [
+      mk({ mId: 'm2', done: true }), mk({ mId: 'm2', done: true }),
+      mk({ mId: 'm2', done: false }), mk({ mId: 'm2', done: false })
+    ]
+    expect(goalStats(goal, tasks).pct).toBe(50)
+  })
+
+  it('falls back to task completion when there are no milestones', () => {
+    const g2: Goal = { ...goal, milestones: [] }
+    expect(goalStats(g2, [mk({ done: true }), mk({ done: false })]).pct).toBe(50)
+    expect(goalStats(g2, []).pct).toBe(0)
   })
 })
 
