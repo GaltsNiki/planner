@@ -23,10 +23,29 @@ function createWindow(): void {
 
   win.on('ready-to-show', () => win.show())
 
-  // Open external links in the OS browser, never in-app.
+  // The renderer's own URL (dev server or the built index.html) — anything else
+  // is an external link that must open in the OS browser, never in-app.
+  const appOrigin = process.env['ELECTRON_RENDERER_URL']
+
+  const isExternal = (url: string): boolean => {
+    if (url.startsWith('http://localhost') || url.startsWith('file://')) return false
+    if (appOrigin && url.startsWith(appOrigin)) return false
+    return /^https?:\/\//i.test(url)
+  }
+
+  // target="_blank" / window.open → OS browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    if (isExternal(url)) void shell.openExternal(url)
     return { action: 'deny' }
+  })
+
+  // Plain <a href> clicks navigate the window in place; intercept and redirect
+  // external ones to the OS browser so the app never gets replaced.
+  win.webContents.on('will-navigate', (event, url) => {
+    if (isExternal(url)) {
+      event.preventDefault()
+      void shell.openExternal(url)
+    }
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {

@@ -44,6 +44,8 @@ export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.E
           {li.primary ? (
             <a
               href={li.primary.href}
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={stop}
               style={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : goal.dotColor, textDecoration: task.done ? 'line-through' : 'none' }}
             >
@@ -61,6 +63,8 @@ export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.E
       {li.primary && (
         <a
           href={li.primary.href}
+          target="_blank"
+          rel="noopener noreferrer"
           onClick={stop}
           style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#c9c9cd', fontSize: 12, textDecoration: 'none' }}
         >

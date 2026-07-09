@@ -11,11 +11,29 @@ export const DAY_FULL = [
   'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'
 ]
 
+/** Monday-first weekday index (0 = Mon … 6 = Sun) for a date. */
+export function dayIndexOf(d: Date): number {
+  return (d.getDay() + 6) % 7
+}
+
+/** The Monday (at midnight) of the week containing `d`. */
+export function mondayOf(d: Date): Date {
+  const m = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  m.setDate(m.getDate() - dayIndexOf(m))
+  return m
+}
+
 /**
- * The Monday anchoring "week offset 0". The prototype fixes this to 2026-07-06
- * so the seeded data lines up; production would use the real current Monday.
+ * The Monday anchoring "week offset 0" — the Monday of the real current week,
+ * so "today" tracks the system clock. Computed once at load. Tests pass an
+ * explicit `anchor` argument to stay deterministic.
  */
-export const WEEK_ANCHOR = new Date(2026, 6, 6)
+export const WEEK_ANCHOR = mondayOf(new Date())
+
+/** The current day's index within the anchor week (0 = Mon … 6 = Sun). */
+export function todayDayIndex(now: Date = new Date()): number {
+  return dayIndexOf(now)
+}
 
 export interface WeekDay {
   num: number

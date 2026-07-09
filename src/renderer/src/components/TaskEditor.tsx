@@ -125,7 +125,7 @@ export function TaskEditor(): React.JSX.Element | null {
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', color: COLORS.textMuted, marginBottom: 8 }}>ССЫЛКИ</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
               {li.links.map((l) => (
-                <a key={l.href} href={l.href} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: 'rgba(232,86,63,0.09)', border: '1px solid rgba(232,86,63,0.22)', borderRadius: 10, color: COLORS.accent, fontSize: 13, textDecoration: 'none' }}>
+                <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: 'rgba(232,86,63,0.09)', border: '1px solid rgba(232,86,63,0.22)', borderRadius: 10, color: COLORS.accent, fontSize: 13, textDecoration: 'none' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Открыть {l.label}</span>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>

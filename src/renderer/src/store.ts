@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type {
   Goal, Task, StaleTask, ChatMap, Settings, View, PlannerData
 } from '@shared/types'
+import { todayDayIndex } from '@shared/dates'
 
 export interface EditorDraft {
   isNew: boolean
@@ -104,10 +105,10 @@ export const usePlanner = create<PlannerState>((set, get) => {
 
   return {
     goals: [], tasks: [], stale: [], chats: {}, settings: {},
-    view: 'today', activeGoalId: 'g1', dayIndex: 1, weekOffset: 0,
+    view: 'today', activeGoalId: 'g1', dayIndex: todayDayIndex(), weekOffset: 0,
     chatOpen: true, draft: '', ed: null, dragOverDay: null,
     leisureSeed: 0, leisureLoading: false, added: {}, addedTaskIds: {},
-    sidebarCollapsed: false, ready: false, todayIndex: 1,
+    sidebarCollapsed: false, ready: false, todayIndex: todayDayIndex(),
 
     hydrate: async () => {
       const data = await window.planner.loadData()

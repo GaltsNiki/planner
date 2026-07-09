@@ -9,18 +9,16 @@ import { GoalDetail } from './views/GoalDetail'
 import { ReviewView } from './views/ReviewView'
 import { TaskEditor } from './components/TaskEditor'
 import { COLORS } from './tokens'
-import { weekModel } from '@shared/dates'
-import { DAY_FULL } from '@shared/dates'
-
-const DAY_NUMS = ['6', '7', '8', '9', '10', '11', '12']
+import { weekModel, offsetToDate, DAY_FULL } from '@shared/dates'
+import { fmtDay } from './components/Calendar'
 
 function useHeader(): { title: string; sub: string } {
   const { view, goals, activeGoalId, dayIndex, todayIndex, weekOffset } = usePlanner()
   const ag = goals.find((g) => g.id === activeGoalId) || goals[0]
   if (view === 'today') {
     return {
-      title: dayIndex === todayIndex ? 'Сегодня' : DAY_FULL[dayIndex],
-      sub: `${DAY_FULL[dayIndex]}, ${DAY_NUMS[dayIndex]} июля`
+      title: weekOffset === 0 && dayIndex === todayIndex ? 'Сегодня' : DAY_FULL[dayIndex],
+      sub: `${DAY_FULL[dayIndex]}, ${fmtDay(offsetToDate(weekOffset, dayIndex))}`
     }
   }
   if (view === 'week') return { title: 'Неделя', sub: weekModel(weekOffset).range }
