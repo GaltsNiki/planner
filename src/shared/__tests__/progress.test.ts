@@ -57,22 +57,36 @@ describe('pctDone', () => {
 
 describe('weekAnalytics', () => {
   const goals: Goal[] = [goal, { ...goal, id: 'g4', milestones: [] }]
-  it('scopes to Mon–Fri and the given week, excludes leisure goal', () => {
+  it('scopes to the full week (Mon–Sun) and the given week, excludes leisure goal', () => {
     const tasks = [
       mk({ day: 0, done: true }),          // Mon, counts
       mk({ day: 4, done: false }),         // Fri, counts
-      mk({ day: 5, done: true }),          // Sat, excluded from biz
+      mk({ day: 5, done: true }),          // Sat, now counts (full week)
       mk({ day: 0, week: 1, done: true }), // other week, excluded
       mk({ goalId: 'g4', day: 1, done: true }) // leisure goal, still in totals but not per-goal
     ]
     const a = weekAnalytics(goals, tasks, 0)
-    expect(a.total).toBe(3) // Mon, Fri, and g4 Tue (day<=4, week 0)
-    expect(a.done).toBe(2)
+    expect(a.total).toBe(4) // Mon, Fri, Sat, and g4 Tue (week 0)
+    expect(a.done).toBe(3)
     expect(a.goals.map((g) => g.goalId)).toEqual(['g1']) // g4 excluded
-    expect(a.bars).toHaveLength(5)
+    expect(a.bars).toHaveLength(7)
     expect(a.bars[0]).toMatchObject({ pct: 100, has: true }) // Mon: only the done g1 task
     expect(a.bars[1]).toMatchObject({ pct: 100, has: true }) // Tue: only the done g4 task
     expect(a.bars[4]).toMatchObject({ pct: 0, has: true }) // Fri: one undone task
+    expect(a.bars[5]).toMatchObject({ pct: 100, has: true }) // Sat: one done task
     expect(a.bars[2]).toMatchObject({ has: false }) // Wed: empty
+    expect(a.bars[6]).toMatchObject({ has: false }) // Sun: empty
+  })
+
+  it('scopes the per-goal row to the active stage, not the whole goal', () => {
+    // goal g1: m1=done, m2=active, m3=todo. Only m2's tasks should count in the row.
+    const tasks = [
+      mk({ mId: 'm2', day: 0, done: true }),  // active stage, done → counts
+      mk({ mId: 'm2', day: 1, done: false }), // active stage, not done → counts
+      mk({ mId: 'm1', day: 2, done: true })   // finished stage → excluded from the row
+    ]
+    const a = weekAnalytics(goals, tasks, 0)
+    const row = a.goals.find((g) => g.goalId === 'g1')!
+    expect(row).toMatchObject({ stageTitle: 'b', done: 1, total: 2, pct: 50 })
   })
 })

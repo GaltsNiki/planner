@@ -91,8 +91,14 @@ interface PlannerState {
   reorderTask: (id: string, beforeId: string) => void
   setDragOverDay: (day: number | null) => void
 
+  // Stages (live goal milestones — edited directly on the goal page)
+  addStage: (goalId: string) => void
+  updateStage: (goalId: string, mId: string, patch: Partial<Milestone>) => void
+  removeStage: (goalId: string, mId: string) => void
+  moveStage: (goalId: string, mId: string, dir: -1 | 1) => void
+
   // Task editor
-  openNew: (goalId: string | null, day: number | null, week: number | null) => void
+  openNew: (goalId: string | null, day: number | null, week: number | null, mId?: string) => void
   openEditor: (id: string) => void
   edField: <K extends keyof EditorDraft>(k: K, v: EditorDraft[K]) => void
   edPickGoal: (id: string) => void
@@ -219,14 +225,64 @@ export const usePlanner = create<PlannerState>((set, get) => {
     },
     setDragOverDay: (day) => set({ dragOverDay: day }),
 
-    openNew: (goalId, day, week) => {
+    // Update a goal's milestones in place and keep the closeness label in sync.
+    addStage: (goalId) => {
+      set((s) => ({
+        goals: s.goals.map((g) => {
+          if (g.id !== goalId) return g
+          const milestones: Milestone[] = [
+            ...g.milestones,
+            { id: 'm' + Date.now() + Math.floor(Math.random() * 1000), title: '', status: 'todo' }
+          ]
+          return { ...g, milestones, closenessLabel: deriveClosenessLabel(milestones) }
+        })
+      }))
+      persist()
+    },
+    updateStage: (goalId, mId, patch) => {
+      set((s) => ({
+        goals: s.goals.map((g) => {
+          if (g.id !== goalId) return g
+          const milestones = g.milestones.map((m) => (m.id === mId ? { ...m, ...patch } : m))
+          return { ...g, milestones, closenessLabel: deriveClosenessLabel(milestones) }
+        })
+      }))
+      persist()
+    },
+    removeStage: (goalId, mId) => {
+      // Leaves any tasks pointing at this stage — they surface under "Прочие задачи".
+      set((s) => ({
+        goals: s.goals.map((g) => {
+          if (g.id !== goalId) return g
+          const milestones = g.milestones.filter((m) => m.id !== mId)
+          return { ...g, milestones, closenessLabel: deriveClosenessLabel(milestones) }
+        })
+      }))
+      persist()
+    },
+    moveStage: (goalId, mId, dir) => {
+      set((s) => ({
+        goals: s.goals.map((g) => {
+          if (g.id !== goalId) return g
+          const ms = g.milestones.slice()
+          const i = ms.findIndex((m) => m.id === mId)
+          const j = i + dir
+          if (i < 0 || j < 0 || j >= ms.length) return g
+          ;[ms[i], ms[j]] = [ms[j], ms[i]]
+          return { ...g, milestones: ms }
+        })
+      }))
+      persist()
+    },
+
+    openNew: (goalId, day, week, mId) => {
       const s = get()
       const g = s.goals.find((x) => x.id === goalId) || s.goals[0]
       // A goal may have no milestones yet — mId is then empty, which is valid.
       const am = g?.milestones.find((m) => m.status === 'active') || g?.milestones[0]
       set({
         ed: {
-          isNew: true, id: null, goalId: g?.id ?? '', mId: am?.id ?? '', title: '', desc: '',
+          isNew: true, id: null, goalId: g?.id ?? '', mId: mId ?? am?.id ?? '', title: '', desc: '',
           day: day == null ? s.todayIndex : day, week: week == null ? 0 : week, done: false
         }
       })

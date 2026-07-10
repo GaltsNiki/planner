@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { usePlanner, GOAL_COLORS } from '../store'
 import { GoalDot } from './primitives'
 import { Calendar, fmtDay } from './Calendar'
@@ -47,6 +47,8 @@ export function GoalEditor(): React.JSX.Element | null {
     goalEdAddMilestone, goalEdUpdateMilestone, goalEdRemoveMilestone, goalEdMoveMilestone
   } = usePlanner()
   const [cal, setCal] = useState<{ x: number; y: number } | null>(null)
+  // Guard against closing when a text-selection drag merely ends on the backdrop.
+  const downOnBackdrop = useRef(false)
 
   if (!gd) return null
 
@@ -54,7 +56,11 @@ export function GoalEditor(): React.JSX.Element | null {
   const deadlineDate = isoToDate(gd.deadline)
 
   return (
-    <div onClick={closeGoalEd} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+    <div
+      onMouseDown={(e) => { downOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={(e) => { if (e.target === e.currentTarget && downOnBackdrop.current) closeGoalEd() }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}
+    >
       <div onClick={(e) => e.stopPropagation()} style={{ width: 560, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto', background: COLORS.cardBg, border: `1px solid ${COLORS.border08}`, borderRadius: 18, padding: '22px 24px 18px', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <div style={{ fontSize: 17, fontWeight: 700 }}>{gd.isNew ? 'Новая цель' : 'Редактировать цель'}</div>

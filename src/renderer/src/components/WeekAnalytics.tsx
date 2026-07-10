@@ -13,7 +13,7 @@ export function WeekAnalytics(): React.JSX.Element {
     <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border06}`, borderRadius: 16, padding: '20px 22px', marginTop: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
         <div style={{ fontSize: 15, fontWeight: 700 }}>Аналитика недели</div>
-        <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>Пн–Пт · прогресс по целям</div>
+        <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>Пн–Вс · прогресс по этапам</div>
         <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 600 }}><span style={{ color: COLORS.accent }}>{a.done}</span> из {a.total} задач · {a.pct}%</div>
       </div>
 
@@ -23,7 +23,12 @@ export function WeekAnalytics(): React.JSX.Element {
             <div key={g.goalId}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7 }}>
                 <GoalDot color={g.dotColor} size={9} />
-                <div style={{ fontSize: 13.5, fontWeight: 500, flex: 1, minWidth: 0 }}>{g.title}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.stageTitle || g.title}</div>
+                  {g.stageTitle && (
+                    <div style={{ fontSize: 11.5, color: COLORS.textFaint2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>{g.title}</div>
+                  )}
+                </div>
                 <div style={{ fontSize: 12.5, color: COLORS.textMuted, fontVariantNumeric: 'tabular-nums' }}>{g.done}/{g.total}</div>
               </div>
               <div style={{ height: 7, borderRadius: 4, background: COLORS.border06, overflow: 'hidden' }}>

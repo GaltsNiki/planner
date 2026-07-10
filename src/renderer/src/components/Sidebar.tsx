@@ -68,7 +68,7 @@ export function Sidebar(): React.JSX.Element {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <NavItem active={view === 'today'} label="Сегодня" onClick={() => setView('today')} icon={icons.today} />
         <NavItem active={view === 'week'} label="Неделя" onClick={() => setView('week')} icon={icons.week} />
-        <NavItem active={view === 'review'} label="Обзор" onClick={() => setView('review')} icon={icons.review} />
+        <NavItem active={view === 'review'} label="Цели" onClick={() => setView('review')} icon={icons.review} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', margin: '22px 8px 8px' }}>

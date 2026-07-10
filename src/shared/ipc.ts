@@ -16,6 +16,9 @@ export interface PlannerApi {
   hasKey(): Promise<boolean>
   setKey(plain: string): Promise<void>
   clearKey(): Promise<void>
+
+  // Clipboard (for the in-app right-click Paste)
+  clipboardRead(): Promise<string>
 }
 
 export const IPC = {
@@ -27,5 +30,6 @@ export const IPC = {
   leisure: 'ai:leisure',
   hasKey: 'key:has',
   setKey: 'key:set',
-  clearKey: 'key:clear'
+  clearKey: 'key:clear',
+  clipboardRead: 'clipboard:read'
 } as const

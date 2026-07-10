@@ -1,0 +1,16 @@
+Weekly dashboard:
+- Add an ability to copy/paste text using RBM
+- Don`t loose progress if I have misclick
+- Add saturday and sunday to the board "Выполнение по дням"
+- How to show progress correctly by stages or by tasks...
+	- Add stages to weekly view not goals. I want to see progress in stage here.
+	- If goal don`t have stage? It`s not a goal))ы
+	- Add an ability to create routine tasks without any goal like clean up, shopping, etc.
+
+	
+
+
+AQ.Ab8RN6L1Do9cT-I9E1w8t1_tMJ20tuqfKyFS_wZ1Ys45Lng2VQ
+projects/182283299343
+182283299343
+

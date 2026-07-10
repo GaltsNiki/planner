@@ -1,14 +1,16 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { usePlanner } from '../store'
 import { linkify, extractTime, stripTime } from '@shared/taskMeta'
 import { useContextMenu } from './ContextMenu'
 import { COLORS } from '../tokens'
 import type { Task, Goal } from '@shared/types'
 
-/** Click-to-edit task row with right-click delete, used in the Today view. */
+/** Click-to-edit task row with a delete button + right-click delete, used in the Today view. */
 export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.Element {
   const { toggleTask, deleteTask, openEditor } = usePlanner()
   const menu = useContextMenu()
+  const [hover, setHover] = useState(false)
+  const [binHover, setBinHover] = useState(false)
 
   const li = linkify(task.desc || '')
   const time = extractTime(task.desc || '')
@@ -25,6 +27,8 @@ export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.E
         { label: 'Изменить задачу', onClick: () => openEditor(task.id) },
         { label: 'Удалить задачу', danger: true, onClick: () => deleteTask(task.id) }
       ])}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       className="row-hover"
       style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', background: COLORS.rowBg, border: `1px solid ${COLORS.border}`, borderRadius: 13, cursor: 'pointer' }}
     >
@@ -74,6 +78,16 @@ export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.E
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>
         </a>
       )}
+
+      <button
+        onClick={(e) => { stop(e); deleteTask(task.id) }}
+        onMouseEnter={() => setBinHover(true)}
+        onMouseLeave={() => setBinHover(false)}
+        title="Удалить задачу"
+        style={{ flex: 'none', width: 30, height: 30, borderRadius: 8, background: binHover ? 'rgba(240,113,92,0.12)' : 'transparent', border: 'none', color: binHover ? '#f0715c' : COLORS.textFaint, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0.3, transition: 'opacity .12s, color .12s, background .12s' }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
+      </button>
 
       {menu.element}
     </div>

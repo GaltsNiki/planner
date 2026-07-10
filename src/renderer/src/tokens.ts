@@ -36,7 +36,9 @@ export const COLORS = {
   textGhost: '#4c4c52',
   taskTitle: '#eaeaec',
 
-  success: 'oklch(0.72 0.15 150)'
+  success: 'oklch(0.72 0.15 150)',
+  successFg: 'oklch(0.78 0.15 150)',
+  successBg: 'oklch(0.72 0.15 150 / 0.14)'
 } as const
 
 export const FONT =

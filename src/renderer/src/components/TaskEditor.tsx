@@ -27,6 +27,9 @@ export function TaskEditor(): React.JSX.Element | null {
   const { ed, goals, edField, edPickGoal, saveEd, deleteEd, closeEd } = usePlanner()
   const notesRef = useRef<HTMLDivElement>(null)
   const initKey = useRef<string | null>(null)
+  // Only treat a backdrop click as "close" when the press STARTED on the backdrop —
+  // otherwise selecting text and releasing outside the modal would discard edits.
+  const downOnBackdrop = useRef(false)
 
   // Seed the contentEditable once per opened task (uncontrolled thereafter).
   const key = ed ? (ed.isNew ? 'new' : ed.id || 'new') : null
@@ -65,7 +68,11 @@ export function TaskEditor(): React.JSX.Element | null {
   }
 
   return (
-    <div onClick={closeEd} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+    <div
+      onMouseDown={(e) => { downOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={(e) => { if (e.target === e.currentTarget && downOnBackdrop.current) closeEd() }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}
+    >
       <div onClick={(e) => e.stopPropagation()} style={{ width: 480, maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto', background: COLORS.cardBg, border: `1px solid ${COLORS.border08}`, borderRadius: 18, padding: '22px 22px 18px', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>{ed.isNew ? 'Новая задача' : 'Задача'}</div>

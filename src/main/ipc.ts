@@ -1,7 +1,7 @@
 // Main-process IPC handlers. Thin wrappers over the services; all secrets and
 // network access live here, never in the renderer.
 
-import { ipcMain } from 'electron'
+import { ipcMain, clipboard } from 'electron'
 import type { Goal, Task, PlannerData } from '@shared/types'
 import { IPC } from '@shared/ipc'
 import { load, save } from './services/storage'
@@ -24,4 +24,6 @@ export function registerIpc(): void {
   ipcMain.handle(IPC.hasKey, () => hasKey())
   ipcMain.handle(IPC.setKey, (_e, plain: string) => setKey(plain))
   ipcMain.handle(IPC.clearKey, () => clearKey())
+
+  ipcMain.handle(IPC.clipboardRead, () => clipboard.readText())
 }

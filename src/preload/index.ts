@@ -16,7 +16,8 @@ const api: PlannerApi = {
     ipcRenderer.invoke(IPC.leisure, seed, location, interests),
   hasKey: () => ipcRenderer.invoke(IPC.hasKey),
   setKey: (plain: string) => ipcRenderer.invoke(IPC.setKey, plain),
-  clearKey: () => ipcRenderer.invoke(IPC.clearKey)
+  clearKey: () => ipcRenderer.invoke(IPC.clearKey),
+  clipboardRead: () => ipcRenderer.invoke(IPC.clipboardRead)
 }
 
 contextBridge.exposeInMainWorld('planner', api)

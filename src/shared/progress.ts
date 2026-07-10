@@ -45,6 +45,8 @@ export function pctDone(tasks: Task[]): number {
 export interface WeekGoalStat {
   goalId: string
   title: string
+  /** The goal's active ("В работе") stage title, or null if none is active. */
+  stageTitle: string | null
   dotColor: string
   done: number
   total: number
@@ -52,7 +54,7 @@ export interface WeekGoalStat {
 }
 
 export interface WeekDayStat {
-  /** 0 = Mon … 4 = Fri */
+  /** 0 = Mon … 6 = Sun */
   day: number
   pct: number
   has: boolean
@@ -70,7 +72,7 @@ export interface WeekAnalytics {
 }
 
 /**
- * Week analytics over Mon–Fri (day <= 4) for a given week offset.
+ * Week analytics over the full week (Mon–Sun) for a given week offset.
  * Excludes the leisure goal (g4) from the per-goal breakdown, matching the design.
  */
 export function weekAnalytics(
@@ -79,18 +81,23 @@ export function weekAnalytics(
   weekOffset: number,
   leisureGoalId = 'g4'
 ): WeekAnalytics {
-  const wkTasks = tasks.filter((t) => (t.week || 0) === weekOffset)
-  const bizTasks = wkTasks.filter((t) => t.day <= 4)
+  const bizTasks = tasks.filter((t) => (t.week || 0) === weekOffset)
   const done = bizTasks.filter((t) => t.done).length
   const total = bizTasks.length
 
   const goalStatsList: WeekGoalStat[] = goals
     .filter((g) => g.id !== leisureGoalId)
     .map((g) => {
-      const ts = bizTasks.filter((t) => t.goalId === g.id)
+      // Track the active stage's tasks for the week, not the whole goal's — a stage
+      // spans weeks, so a full week's stage tasks can be done without the stage being done.
+      const active = g.milestones.find((m) => m.status === 'active')
+      const ts = active
+        ? bizTasks.filter((t) => t.goalId === g.id && t.mId === active.id)
+        : bizTasks.filter((t) => t.goalId === g.id)
       return {
         goalId: g.id,
         title: g.title,
+        stageTitle: active ? active.title : null,
         dotColor: g.dotColor,
         done: ts.filter((t) => t.done).length,
         total: ts.length,
@@ -98,7 +105,7 @@ export function weekAnalytics(
       }
     })
 
-  const bars: WeekDayStat[] = [0, 1, 2, 3, 4].map((day) => {
+  const bars: WeekDayStat[] = [0, 1, 2, 3, 4, 5, 6].map((day) => {
     const ts = bizTasks.filter((t) => t.day === day)
     return { day, pct: pctDone(ts), has: ts.length > 0, done: ts.filter((t) => t.done).length, total: ts.length }
   })
