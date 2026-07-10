@@ -7,6 +7,7 @@ import { TodayView } from './views/TodayView'
 import { WeekView } from './views/WeekView'
 import { GoalDetail } from './views/GoalDetail'
 import { ReviewView } from './views/ReviewView'
+import { HabitsView } from './views/HabitsView'
 import { TaskEditor } from './components/TaskEditor'
 import { GoalEditor } from './components/GoalEditor'
 import { TextContextMenu } from './components/TextContextMenu'
@@ -24,6 +25,7 @@ function useHeader(): { title: string; sub: string } {
     }
   }
   if (view === 'week') return { title: 'Неделя', sub: weekModel(weekOffset).range }
+  if (view === 'habits') return { title: 'Привычки', sub: 'Ежедневные привычки по дням недели' }
   if (view === 'review') return { title: 'Обзор', sub: 'Итоги недели' }
   return { title: ag?.title ?? '', sub: ag?.category ?? '' }
 }
@@ -75,6 +77,7 @@ export function App(): React.JSX.Element {
         <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
           {view === 'today' && <TodayView />}
           {view === 'week' && <WeekView />}
+          {view === 'habits' && <HabitsView />}
           {view === 'goal' && <GoalDetail />}
           {view === 'review' && <ReviewView />}
         </div>

@@ -46,3 +46,7 @@ input, textarea { font-family: inherit; }
 
 /* Week mini-card zones */
 .mini-open:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Habit board cells: empty cell shows an accent tint on hover. */
+.habit-cell-empty:hover { background: rgba(232,86,63,0.14) !important; border-color: rgba(232,86,63,0.35) !important; }
+.habit-cell-done:hover { filter: brightness(1.08); }

@@ -77,6 +77,12 @@ export function seedData(): PlannerData {
     settings: {
       location: 'Санкт-Петербург',
       interests: ['театр', 'природа', 'музыка', 'кофе']
-    }
+    },
+    habits: [
+      { id: 'h1', title: 'Зарядка утром', done: ['0:0', '0:1', '0:3'] },
+      { id: 'h2', title: 'Читать 20 минут', done: ['0:0', '0:2', '0:3', '0:4'] },
+      { id: 'h3', title: 'Без сахара', done: ['0:1'] },
+      { id: 'h4', title: 'Медитация', done: [] }
+    ]
   }
 }

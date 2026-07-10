@@ -36,6 +36,31 @@ function createWindow(): void {
 
   win.on('ready-to-show', () => win.show())
 
+  // Zoom shortcuts (no app menu, so wire them up manually):
+  //   Ctrl/Cmd + '='/'+'  zoom in · Ctrl/Cmd + '-'  zoom out · Ctrl/Cmd + '0'  reset.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return
+    const mod = process.platform === 'darwin' ? input.meta : input.control
+    if (!mod) return
+    const level = win.webContents.getZoomLevel()
+    if (input.key === '=' || input.key === '+') {
+      win.webContents.setZoomLevel(Math.min(level + 0.5, 5))
+      event.preventDefault()
+    } else if (input.key === '-' || input.key === '_') {
+      win.webContents.setZoomLevel(Math.max(level - 0.5, -3))
+      event.preventDefault()
+    } else if (input.key === '0') {
+      win.webContents.setZoomLevel(0)
+      event.preventDefault()
+    }
+  })
+
+  // Ctrl/Cmd + mouse wheel to zoom, like a browser.
+  win.webContents.on('zoom-changed', (_e, direction) => {
+    const level = win.webContents.getZoomLevel()
+    win.webContents.setZoomLevel(direction === 'in' ? Math.min(level + 0.5, 5) : Math.max(level - 0.5, -3))
+  })
+
   // The renderer's own URL (dev server or the built index.html) — anything else
   // is an external link that must open in the OS browser, never in-app.
   const appOrigin = process.env['ELECTRON_RENDERER_URL']

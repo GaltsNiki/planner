@@ -2,7 +2,7 @@
 
 export type MilestoneStatus = 'done' | 'active' | 'todo'
 export type ChatRole = 'user' | 'assistant'
-export type View = 'today' | 'week' | 'goal' | 'review'
+export type View = 'today' | 'week' | 'goal' | 'review' | 'habits'
 
 export interface Milestone {
   id: string
@@ -44,6 +44,13 @@ export interface Task {
   week: number
 }
 
+export interface Habit {
+  id: string
+  title: string
+  /** Completion keys `"<weekOffset>:<dayIndex>"` that are marked done. */
+  done: string[]
+}
+
 export interface StaleTask {
   id: string
   goalId: string
@@ -72,6 +79,7 @@ export interface PlannerData {
   stale: StaleTask[]
   chats: ChatMap
   settings: Settings
+  habits: Habit[]
 }
 
 /** A leisure suggestion returned by the (mock) web search. */

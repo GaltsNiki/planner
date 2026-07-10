@@ -22,7 +22,8 @@ export function deserialize(raw: string): PlannerData {
       tasks: parsed.tasks ?? seed.tasks,
       stale: parsed.stale ?? seed.stale,
       chats: parsed.chats ?? seed.chats,
-      settings: parsed.settings ?? seed.settings
+      settings: parsed.settings ?? seed.settings,
+      habits: parsed.habits ?? seed.habits
     }
   } catch {
     return seedData()

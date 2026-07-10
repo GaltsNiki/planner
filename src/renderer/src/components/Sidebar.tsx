@@ -45,6 +45,12 @@ export function Sidebar(): React.JSX.Element {
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="9" /><path d="M12 3 a9 9 0 0 1 9 9" strokeWidth="2.6" />
       </svg>
+    ),
+    habits: (
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="4" width="4" height="4" rx="1" /><rect x="10" y="4" width="4" height="4" rx="1" /><rect x="17" y="4" width="4" height="4" rx="1" />
+        <rect x="3" y="11" width="4" height="4" rx="1" /><rect x="10" y="11" width="4" height="4" rx="1" /><rect x="17" y="11" width="4" height="4" rx="1" />
+      </svg>
     )
   }
 
@@ -68,6 +74,7 @@ export function Sidebar(): React.JSX.Element {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <NavItem active={view === 'today'} label="Сегодня" onClick={() => setView('today')} icon={icons.today} />
         <NavItem active={view === 'week'} label="Неделя" onClick={() => setView('week')} icon={icons.week} />
+        <NavItem active={view === 'habits'} label="Привычки" onClick={() => setView('habits')} icon={icons.habits} />
         <NavItem active={view === 'review'} label="Цели" onClick={() => setView('review')} icon={icons.review} />
       </div>
 

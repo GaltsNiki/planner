@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type {
-  Goal, Task, StaleTask, ChatMap, Settings, View, PlannerData, Milestone, MilestoneStatus
+  Goal, Task, StaleTask, ChatMap, Settings, View, PlannerData, Milestone, MilestoneStatus, Habit
 } from '@shared/types'
 import { todayDayIndex } from '@shared/dates'
 import { deriveClosenessLabel } from '@shared/closeness'
@@ -48,6 +48,7 @@ interface PlannerState {
   stale: StaleTask[]
   chats: ChatMap
   settings: Settings
+  habits: Habit[]
 
   // View / UI state (not persisted)
   view: View
@@ -97,6 +98,12 @@ interface PlannerState {
   removeStage: (goalId: string, mId: string) => void
   moveStage: (goalId: string, mId: string, dir: -1 | 1) => void
 
+  // Habits
+  addHabit: () => void
+  renameHabit: (id: string, title: string) => void
+  deleteHabit: (id: string) => void
+  toggleHabitDay: (id: string, key: string) => void
+
   // Task editor
   openNew: (goalId: string | null, day: number | null, week: number | null, mId?: string) => void
   openEditor: (id: string) => void
@@ -138,7 +145,7 @@ export const usePlanner = create<PlannerState>((set, get) => {
     saveTimer = setTimeout(() => {
       const s = get()
       const data: PlannerData = {
-        goals: s.goals, tasks: s.tasks, stale: s.stale, chats: s.chats, settings: s.settings
+        goals: s.goals, tasks: s.tasks, stale: s.stale, chats: s.chats, settings: s.settings, habits: s.habits
       }
       void window.planner.saveData(data)
     }, 250)
@@ -150,7 +157,7 @@ export const usePlanner = create<PlannerState>((set, get) => {
   }
 
   return {
-    goals: [], tasks: [], stale: [], chats: {}, settings: {},
+    goals: [], tasks: [], stale: [], chats: {}, settings: {}, habits: [],
     view: 'today', activeGoalId: 'g1', dayIndex: todayDayIndex(), weekOffset: 0,
     chatOpen: true, draft: '', ed: null, goalEd: null, dragOverDay: null,
     leisureSeed: 0, leisureLoading: false, added: {}, addedTaskIds: {},
@@ -160,7 +167,7 @@ export const usePlanner = create<PlannerState>((set, get) => {
       const data = await window.planner.loadData()
       set({
         goals: data.goals, tasks: data.tasks, stale: data.stale,
-        chats: data.chats, settings: data.settings, ready: true
+        chats: data.chats, settings: data.settings, habits: data.habits ?? [], ready: true
       })
     },
 
@@ -271,6 +278,29 @@ export const usePlanner = create<PlannerState>((set, get) => {
           ;[ms[i], ms[j]] = [ms[j], ms[i]]
           return { ...g, milestones: ms }
         })
+      }))
+      persist()
+    },
+
+    addHabit: () => {
+      set((s) => ({ habits: [...s.habits, { id: 'h' + Date.now(), title: '', done: [] }] }))
+      persist()
+    },
+    renameHabit: (id, title) => {
+      set((s) => ({ habits: s.habits.map((h) => (h.id === id ? { ...h, title } : h)) }))
+      persist()
+    },
+    deleteHabit: (id) => {
+      set((s) => ({ habits: s.habits.filter((h) => h.id !== id) }))
+      persist()
+    },
+    toggleHabitDay: (id, key) => {
+      set((s) => ({
+        habits: s.habits.map((h) =>
+          h.id === id
+            ? { ...h, done: h.done.includes(key) ? h.done.filter((k) => k !== key) : [...h.done, key] }
+            : h
+        )
       }))
       persist()
     },
