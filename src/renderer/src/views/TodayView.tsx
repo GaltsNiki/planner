@@ -4,7 +4,6 @@ import { TaskRow } from '../components/TaskRow'
 import { GoalDot } from '../components/primitives'
 import { Calendar, fmtDay } from '../components/Calendar'
 import { useContextMenu } from '../components/ContextMenu'
-import { goalStats } from '@shared/progress'
 import { byTime } from '@shared/taskMeta'
 import { staleRows } from '@shared/staleness'
 import { DAY_FULL, offsetToDate, dateToOffset } from '@shared/dates'
@@ -67,14 +66,23 @@ export function TodayView(): React.JSX.Element {
   const tTotal = todayTasks.length
   const todayPct = tTotal ? Math.round((tDone / tTotal) * 100) : 0
 
-  const goalGroups = goals
-    .map((goal) => {
-      const goalTasks = todayTasks.filter((task) => task.goalId === goal.id).slice().sort(byTime)
-      if (!goalTasks.length) return null
-      const stats = goalStats(goal, tasks)
-      return { goal, goalTasks, stats }
-    })
-    .filter((group): group is NonNullable<typeof group> => group !== null)
+  // Group today's tasks by their stage (milestone), so the header over the
+  // tasks is the stage — not the goal (the goal name shows as a subtitle).
+  const stageGroups = goals.flatMap((goal) => {
+    const gTasks = todayTasks.filter((t) => t.goalId === goal.id)
+    if (!gTasks.length) return []
+    const mIds = new Set(goal.milestones.map((m) => m.id))
+    const byStage = goal.milestones
+      .map((m) => ({
+        goal, key: `${goal.id}:${m.id}`, stageTitle: m.title as string | null,
+        tasks: gTasks.filter((t) => t.mId === m.id).slice().sort(byTime)
+      }))
+      .filter((g) => g.tasks.length)
+    // Tasks whose stage no longer exists fall back to a goal-titled group.
+    const loose = gTasks.filter((t) => !mIds.has(t.mId)).slice().sort(byTime)
+    if (loose.length) byStage.push({ goal, key: `${goal.id}:none`, stageTitle: null, tasks: loose })
+    return byStage
+  })
 
   const staleList = staleRows(stale, goals)
 
@@ -92,8 +100,8 @@ export function TodayView(): React.JSX.Element {
         </div>
       </div>
 
-      {goalGroups.map(({ goal, goalTasks, stats }) => (
-        <div key={goal.id} style={{ marginBottom: 26 }}>
+      {stageGroups.map(({ goal, key, stageTitle, tasks: groupTasks }) => (
+        <div key={key} style={{ marginBottom: 26 }}>
           <div
             onClick={() => selectGoal(goal.id)}
             onContextMenu={menu.open([
@@ -104,11 +112,11 @@ export function TodayView(): React.JSX.Element {
             style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 0 12px 2px', cursor: 'pointer' }}
           >
             <GoalDot color={goal.dotColor} size={9} />
-            <div style={{ fontSize: 14.5, fontWeight: 600 }}>{goal.title}</div>
-            <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>{stats.mDone}/{stats.mTotal} этапа</div>
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>{stageTitle ?? goal.title}</div>
+            {stageTitle && <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>· {goal.title}</div>}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {goalTasks.map((task) => <TaskRow key={task.id} task={task} goal={goal} />)}
+            {groupTasks.map((task) => <TaskRow key={task.id} task={task} goal={goal} />)}
           </div>
         </div>
       ))}
@@ -120,7 +128,7 @@ export function TodayView(): React.JSX.Element {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '13px 15px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 13, cursor: 'pointer', color: COLORS.textFaint, fontSize: 14, marginBottom: 26 }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>
-        <span>{goalGroups.length ? 'Добавить задачу' : 'На этот день пока нет задач — добавить'}</span>
+        <span>{stageGroups.length ? 'Добавить задачу' : 'На этот день пока нет задач — добавить'}</span>
       </div>
 
       <div style={{ background: COLORS.accent06, border: `1px solid ${COLORS.accent18}`, borderRadius: 16, padding: '18px 20px' }}>
