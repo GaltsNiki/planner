@@ -26,7 +26,7 @@ function NavItem({
 }
 
 export function Sidebar(): React.JSX.Element {
-  const { goals, tasks, view, activeGoalId, setView, selectGoal, deleteGoal, openNewGoal, openEditGoal, toggleSidebar } = usePlanner()
+  const { goals, tasks, view, activeGoalId, setView, selectGoal, deleteGoal, openNewGoal, openEditGoal, toggleSidebar, openSettings, hasApiKey } = usePlanner()
 
   const icons: Record<Exclude<View, 'goal'>, React.JSX.Element> = {
     today: (
@@ -59,7 +59,7 @@ export function Sidebar(): React.JSX.Element {
   return (
     <div style={{ width: 264, flex: 'none', display: 'flex', flexDirection: 'column', background: COLORS.sidebarBg, borderRight: `1px solid ${COLORS.border}`, padding: '18px 14px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 8px 20px' }}>
-        <img src="/icon.png" alt="Planner" width={28} height={28} style={{ flex: 'none', borderRadius: 7, boxShadow: '0 2px 8px rgba(232,86,63,0.35)' }} />
+        <img src="/icon.png" alt="Planner" width={28} height={28} style={{ flex: 'none', borderRadius: '50%', boxShadow: '0 2px 8px rgba(245,138,31,0.35)' }} />
         <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.2px' }}>Planner</div>
         <button
           onClick={toggleSidebar}
@@ -75,7 +75,7 @@ export function Sidebar(): React.JSX.Element {
         <NavItem active={view === 'today'} label="Сегодня" onClick={() => setView('today')} icon={icons.today} />
         <NavItem active={view === 'week'} label="Неделя" onClick={() => setView('week')} icon={icons.week} />
         <NavItem active={view === 'habits'} label="Привычки" onClick={() => setView('habits')} icon={icons.habits} />
-        <NavItem active={view === 'review'} label="Цели" onClick={() => setView('review')} icon={icons.review} />
+        <NavItem active={view === 'review'} label="Обзор" onClick={() => setView('review')} icon={icons.review} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', margin: '22px 8px 8px' }}>
@@ -118,16 +118,24 @@ export function Sidebar(): React.JSX.Element {
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 12, borderTop: `1px solid ${COLORS.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, cursor: 'pointer', color: COLORS.textSecondary, fontSize: 14, fontWeight: 500 }}>
+        <div
+          onClick={openSettings}
+          className="row-hover"
+          style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, cursor: 'pointer', color: COLORS.textSecondary, fontSize: 14, fontWeight: 500 }}
+        >
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="4" y1="8" x2="20" y2="8" /><circle cx="9" cy="8" r="2.4" fill="#0a0a0c" />
             <line x1="4" y1="16" x2="20" y2="16" /><circle cx="15" cy="16" r="2.4" fill="#0a0a0c" />
           </svg>
           <span>Настройки</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', fontSize: 12, color: COLORS.textFaint }}>
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: COLORS.success, boxShadow: '0 0 8px oklch(0.72 0.15 150 / 0.6)' }} />
-          API-ключ подключён
+        <div
+          onClick={openSettings}
+          title={hasApiKey ? 'API-ключ подключён' : 'Ключа нет — демо-режим. Открыть настройки'}
+          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', fontSize: 12, color: COLORS.textFaint, cursor: 'pointer' }}
+        >
+          <div style={{ width: 7, height: 7, borderRadius: '50%', flex: 'none', background: hasApiKey ? COLORS.success : COLORS.textDisabled, boxShadow: hasApiKey ? '0 0 8px oklch(0.72 0.15 150 / 0.6)' : 'none' }} />
+          {hasApiKey ? 'API-ключ подключён' : 'Демо-режим (нет ключа)'}
         </div>
       </div>
 

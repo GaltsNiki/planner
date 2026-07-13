@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { stepSegments, deriveClosenessLabel } from '../closeness'
-import { staleRows, isStale } from '../staleness'
+import { stepSegments, deriveClosenessLabel, patchMilestones } from '../closeness'
+import { staleRows, isStale, computeStale } from '../staleness'
 import { chatReply, breakDownReply, leisureSuggestions, weeklyReview } from '../mockAI'
 import { seedData } from '../seed'
-import type { Goal } from '../types'
+import type { Goal, Task, Milestone } from '../types'
+
+const DAY_MS = 86400000
+const mkTask = (over: Partial<Task>): Task => ({
+  id: 't', goalId: 'g1', mId: 'm1', title: 'T', desc: '', done: false, day: 0, week: 0, ...over
+})
 
 const goal: Goal = {
   id: 'g1', title: 'G', category: 'C', dotColor: '#E8563F',
@@ -51,6 +56,46 @@ describe('staleness', () => {
     )
     expect(rows[0].goalTitle).toBe('G')
     expect(rows[0].daysLabel).toBe('9 дней без движения')
+  })
+})
+
+describe('computeStale', () => {
+  const now = 1_000 * DAY_MS
+  it('flags incomplete tasks untouched for >= threshold days, most-stale first', () => {
+    const tasks = [
+      mkTask({ id: 'fresh', updatedAt: now - 2 * DAY_MS }),
+      mkTask({ id: 'stuck', updatedAt: now - 10 * DAY_MS }),
+      mkTask({ id: 'stuckMore', updatedAt: now - 20 * DAY_MS })
+    ]
+    const rows = computeStale(tasks, now)
+    expect(rows.map((r) => r.id)).toEqual(['stuckMore', 'stuck'])
+    expect(rows[0].days).toBe(20)
+  })
+  it('ignores done tasks and tasks with no updatedAt (treated as fresh)', () => {
+    const tasks = [
+      mkTask({ id: 'done', done: true, updatedAt: now - 30 * DAY_MS }),
+      mkTask({ id: 'legacy' }) // no updatedAt
+    ]
+    expect(computeStale(tasks, now)).toEqual([])
+  })
+})
+
+describe('patchMilestones (single active)', () => {
+  const ms: Milestone[] = [
+    { id: 'm1', title: 'a', status: 'active' },
+    { id: 'm2', title: 'b', status: 'todo' },
+    { id: 'm3', title: 'c', status: 'todo' }
+  ]
+  it('demotes a previously-active stage when another becomes active', () => {
+    const next = patchMilestones(ms, 'm3', { status: 'active' })
+    expect(next.find((m) => m.id === 'm1')!.status).toBe('todo')
+    expect(next.find((m) => m.id === 'm3')!.status).toBe('active')
+    expect(next.filter((m) => m.status === 'active')).toHaveLength(1)
+  })
+  it('leaves other stages untouched for non-active patches', () => {
+    const next = patchMilestones(ms, 'm2', { title: 'renamed' })
+    expect(next.find((m) => m.id === 'm1')!.status).toBe('active')
+    expect(next.find((m) => m.id === 'm2')!.title).toBe('renamed')
   })
 })
 

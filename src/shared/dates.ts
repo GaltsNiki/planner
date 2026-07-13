@@ -24,15 +24,22 @@ export function mondayOf(d: Date): Date {
 }
 
 /**
- * The Monday anchoring "week offset 0" — the Monday of the real current week,
- * so "today" tracks the system clock. Computed once at load. Tests pass an
- * explicit `anchor` argument to stay deterministic.
+ * Fixed Monday epoch that anchors the *absolute* week index. It never moves, so a
+ * stored week index always points at the same real calendar week (this is what keeps
+ * tasks from drifting into the current week as the calendar rolls forward).
+ * `WEEK_ANCHOR` is the default anchor for the date math; tests pass an explicit one.
  */
-export const WEEK_ANCHOR = mondayOf(new Date())
+export const EPOCH_MONDAY = new Date(2020, 0, 6) // Mon, 6 Jan 2020
+export const WEEK_ANCHOR = EPOCH_MONDAY
 
-/** The current day's index within the anchor week (0 = Mon … 6 = Sun). */
+/** The current day's index within the week (0 = Mon … 6 = Sun). */
 export function todayDayIndex(now: Date = new Date()): number {
   return dayIndexOf(now)
+}
+
+/** The absolute week index (from the epoch) of the week containing `now`. */
+export function currentWeekIndex(now: Date = new Date()): number {
+  return dateToOffset(now).weekOffset
 }
 
 export interface WeekDay {
@@ -65,9 +72,9 @@ export function weekModel(offset: number, anchor: Date = WEEK_ANCHOR): WeekModel
   return { days, range }
 }
 
-export function weekBadge(offset: number): string {
-  if (offset === 0) return 'Текущая неделя'
-  return offset < 0 ? 'Прошлая неделя' : 'Будущая неделя'
+export function weekBadge(offset: number, current: number = currentWeekIndex()): string {
+  if (offset === current) return 'Текущая неделя'
+  return offset < current ? 'Прошлая неделя' : 'Будущая неделя'
 }
 
 /** Midnight of a date, for whole-day math. */

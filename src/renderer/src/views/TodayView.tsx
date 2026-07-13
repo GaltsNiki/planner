@@ -5,8 +5,9 @@ import { GoalDot } from '../components/primitives'
 import { Calendar, fmtDay } from '../components/Calendar'
 import { useContextMenu } from '../components/ContextMenu'
 import { byTime } from '@shared/taskMeta'
-import { staleRows } from '@shared/staleness'
-import { DAY_FULL, offsetToDate, dateToOffset } from '@shared/dates'
+import { ROUTINE_GOAL } from '@shared/routine'
+import { staleRows, computeStale } from '@shared/staleness'
+import { DAY_FULL, offsetToDate, dateToOffset, currentWeekIndex } from '@shared/dates'
 import { COLORS } from '../tokens'
 
 function DateNavigator(): React.JSX.Element {
@@ -16,7 +17,7 @@ function DateNavigator(): React.JSX.Element {
   const currentDate = offsetToDate(weekOffset, dayIndex)
   const previousDate = offsetToDate(weekOffset, dayIndex - 1)
   const nextDate = offsetToDate(weekOffset, dayIndex + 1)
-  const todayDate = offsetToDate(0, todayIndex)
+  const todayDate = offsetToDate(currentWeekIndex(), todayIndex)
 
   // Step across week boundaries so nav isn't clamped inside a single week.
   const step = (delta: number): void => {
@@ -58,7 +59,7 @@ function DateNavigator(): React.JSX.Element {
 }
 
 export function TodayView(): React.JSX.Element {
-  const { goals, tasks, stale, dayIndex, weekOffset, selectGoal, deleteGoal, openEditGoal, openNew, breakDown } = usePlanner()
+  const { goals, tasks, dayIndex, weekOffset, selectGoal, deleteGoal, openEditGoal, openNew, breakDown } = usePlanner()
   const menu = useContextMenu()
 
   const todayTasks = tasks.filter((t) => t.day === dayIndex && (t.week || 0) === weekOffset)
@@ -84,7 +85,13 @@ export function TodayView(): React.JSX.Element {
     return byStage
   })
 
-  const staleList = staleRows(stale, goals)
+  // Routine tasks: not attached to any existing goal.
+  const routineTasks = todayTasks
+    .filter((t) => !goals.some((g) => g.id === t.goalId))
+    .slice()
+    .sort(byTime)
+
+  const staleList = staleRows(computeStale(tasks), goals)
 
   return (
     <div style={{ maxWidth: 760, margin: '0 auto' }}>
@@ -121,6 +128,19 @@ export function TodayView(): React.JSX.Element {
         </div>
       ))}
 
+      {/* Routine — tasks without a goal (cleaning, shopping, errands…). */}
+      {routineTasks.length > 0 && (
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 0 12px 2px' }}>
+            <GoalDot color={ROUTINE_GOAL.dotColor} size={9} />
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>{ROUTINE_GOAL.title}</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {routineTasks.map((task) => <TaskRow key={task.id} task={task} goal={ROUTINE_GOAL} />)}
+          </div>
+        </div>
+      )}
+
       {/* Always-available add button — the fix for "no tasks left, nowhere to add". */}
       <div
         onClick={() => openNew(null, dayIndex, weekOffset)}
@@ -128,9 +148,10 @@ export function TodayView(): React.JSX.Element {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '13px 15px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 13, cursor: 'pointer', color: COLORS.textFaint, fontSize: 14, marginBottom: 26 }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>
-        <span>{stageGroups.length ? 'Добавить задачу' : 'На этот день пока нет задач — добавить'}</span>
+        <span>{stageGroups.length || routineTasks.length ? 'Добавить задачу' : 'На этот день пока нет задач — добавить'}</span>
       </div>
 
+      {staleList.length > 0 && (
       <div style={{ background: COLORS.accent06, border: `1px solid ${COLORS.accent18}`, borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
           <div style={{ fontSize: 14.5, fontWeight: 600 }}>Застряли?</div>
@@ -149,6 +170,7 @@ export function TodayView(): React.JSX.Element {
           ))}
         </div>
       </div>
+      )}
 
       {menu.element}
     </div>

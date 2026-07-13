@@ -50,6 +50,12 @@ export function getKey(): string | null {
   return process.env.GEMINI_API_KEY || null
 }
 
+/**
+ * Remove the stored keychain file. `force` makes this a no-op when the file is
+ * absent (e.g. the key only ever came from GEMINI_API_KEY) instead of throwing
+ * ENOENT. Note: an env-var key cannot be cleared from here, so hasKey() may still
+ * report true afterwards if GEMINI_API_KEY is set.
+ */
 export function clearKey(): void {
-  if (hasKey()) rmSync(keyPath())
+  rmSync(keyPath(), { force: true })
 }

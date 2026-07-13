@@ -29,11 +29,13 @@ export const COLORS = {
 
   textPrimary: '#f2f2f3',
   textSecondary: '#b4b4b9',
-  textMuted: '#8a8a90',
-  textFaint: '#7a7a80',
-  textFaint2: '#6f6f75',
-  textDisabled: '#5c5c62',
-  textGhost: '#4c4c52',
+  textMuted: '#9a9aa0',
+  // Raised for WCAG AA: these carry real metadata/labels, so they meet ~4.5:1 on
+  // the near-black app background rather than the old 2.8–3.7:1.
+  textFaint: '#8f8f96',
+  textFaint2: '#87878e',
+  textDisabled: '#7c7c83',
+  textGhost: '#4c4c52', // decorative only (disabled arrow glyphs)
   taskTitle: '#eaeaec',
 
   success: 'oklch(0.72 0.15 150)',

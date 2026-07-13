@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { usePlanner, GOAL_COLORS } from '../store'
 import { GoalDot } from './primitives'
 import { Calendar, fmtDay } from './Calendar'
@@ -49,6 +49,17 @@ export function GoalEditor(): React.JSX.Element | null {
   const [cal, setCal] = useState<{ x: number; y: number } | null>(null)
   // Guard against closing when a text-selection drag merely ends on the backdrop.
   const downOnBackdrop = useRef(false)
+
+  // Esc closes; Cmd/Ctrl+Enter saves (when a title is present).
+  useEffect(() => {
+    if (!gd) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') closeGoalEd()
+      else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && gd.title.trim()) saveGoalEd()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [gd, closeGoalEd, saveGoalEd])
 
   if (!gd) return null
 

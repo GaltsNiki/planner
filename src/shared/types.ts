@@ -40,8 +40,14 @@ export interface Task {
   done: boolean
   /** 0 = Monday … 6 = Sunday. */
   day: number
-  /** Week offset relative to the current week (0 = current). */
+  /** Absolute week index counted from the epoch (see EPOCH_MONDAY in dates.ts). */
   week: number
+  /**
+   * Epoch ms of the last time the task was created/edited/toggled/moved.
+   * Optional so pre-existing tasks stay valid; missing ⇒ treated as "fresh"
+   * (never stale) by computeStale(). Drives the real staleness detection.
+   */
+  updatedAt?: number
 }
 
 export interface Habit {
@@ -80,6 +86,8 @@ export interface PlannerData {
   chats: ChatMap
   settings: Settings
   habits: Habit[]
+  /** Schema/migration version. Absent ⇒ pre-migration (relative week offsets). */
+  version?: number
 }
 
 /** A leisure suggestion returned by the (mock) web search. */

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { usePlanner } from './store'
 import { Sidebar } from './components/Sidebar'
 import { ChatPanel } from './components/ChatPanel'
-import { ClaudeMark } from './components/primitives'
+import { ClaudeMark, Spinner } from './components/primitives'
 import { TodayView } from './views/TodayView'
 import { WeekView } from './views/WeekView'
 import { GoalDetail } from './views/GoalDetail'
@@ -10,9 +10,11 @@ import { ReviewView } from './views/ReviewView'
 import { HabitsView } from './views/HabitsView'
 import { TaskEditor } from './components/TaskEditor'
 import { GoalEditor } from './components/GoalEditor'
+import { Settings } from './components/Settings'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { TextContextMenu } from './components/TextContextMenu'
 import { COLORS } from './tokens'
-import { weekModel, offsetToDate, DAY_FULL } from '@shared/dates'
+import { weekModel, offsetToDate, DAY_FULL, currentWeekIndex } from '@shared/dates'
 import { fmtDay } from './components/Calendar'
 
 function useHeader(): { title: string; sub: string } {
@@ -20,7 +22,7 @@ function useHeader(): { title: string; sub: string } {
   const ag = goals.find((g) => g.id === activeGoalId) || goals[0]
   if (view === 'today') {
     return {
-      title: weekOffset === 0 && dayIndex === todayIndex ? 'Сегодня' : DAY_FULL[dayIndex],
+      title: weekOffset === currentWeekIndex() && dayIndex === todayIndex ? 'Сегодня' : DAY_FULL[dayIndex],
       sub: `${DAY_FULL[dayIndex]}, ${fmtDay(offsetToDate(weekOffset, dayIndex))}`
     }
   }
@@ -38,8 +40,12 @@ export function App(): React.JSX.Element {
 
   if (!ready) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.textFaint }}>
-        Загрузка…
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, background: COLORS.appBg }}>
+        <ClaudeMark size={40} radius={11} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: COLORS.textMuted, fontSize: 13.5 }}>
+          <Spinner size={15} />
+          Загрузка…
+        </div>
       </div>
     )
   }
@@ -75,17 +81,20 @@ export function App(): React.JSX.Element {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
-          {view === 'today' && <TodayView />}
-          {view === 'week' && <WeekView />}
-          {view === 'habits' && <HabitsView />}
-          {view === 'goal' && <GoalDetail />}
-          {view === 'review' && <ReviewView />}
+          <ErrorBoundary>
+            {view === 'today' && <TodayView />}
+            {view === 'week' && <WeekView />}
+            {view === 'habits' && <HabitsView />}
+            {view === 'goal' && <GoalDetail />}
+            {view === 'review' && <ReviewView />}
+          </ErrorBoundary>
         </div>
       </div>
 
       {chatOpen && <ChatPanel />}
       {ed && <TaskEditor />}
       <GoalEditor />
+      <Settings />
       <TextContextMenu />
     </div>
   )

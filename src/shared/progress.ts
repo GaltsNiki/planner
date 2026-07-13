@@ -1,6 +1,7 @@
 // Progress math — pure functions over task `done` flags.
 
 import type { Goal, Task } from './types'
+import { LEISURE_GOAL_ID } from './leisure'
 
 export interface GoalStats {
   done: number
@@ -79,7 +80,7 @@ export function weekAnalytics(
   goals: Goal[],
   tasks: Task[],
   weekOffset: number,
-  leisureGoalId = 'g4'
+  leisureGoalId = LEISURE_GOAL_ID
 ): WeekAnalytics {
   const bizTasks = tasks.filter((t) => (t.week || 0) === weekOffset)
   const done = bizTasks.filter((t) => t.done).length

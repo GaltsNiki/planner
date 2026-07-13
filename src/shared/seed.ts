@@ -1,9 +1,13 @@
 // Initial planner document, ported verbatim from the prototype's seed state.
+// Authored with relative week offsets (week 0 = "current"); `migrate()` converts
+// them to absolute current-week indices and stamps the schema version, so a fresh
+// install lands on the current week just like migrated user data.
 
 import type { PlannerData } from './types'
+import { migrate } from './migrate'
 
 export function seedData(): PlannerData {
-  return {
+  return migrate({
     goals: [
       {
         id: 'g1', title: 'Прийти в форму', category: 'Здоровье', dotColor: '#E8563F',
@@ -84,5 +88,5 @@ export function seedData(): PlannerData {
       { id: 'h3', title: 'Без сахара', done: ['0:1'] },
       { id: 'h4', title: 'Медитация', done: [] }
     ]
-  }
+  })
 }

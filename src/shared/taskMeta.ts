@@ -6,6 +6,20 @@ export interface LinkInfo {
   label: string
 }
 
+/**
+ * Escape the five HTML-significant characters so untrusted text (e.g. a
+ * web-sourced leisure suggestion) is safe to store in a description that is later
+ * rendered as HTML. Pure string transform — no DOM required.
+ */
+export function escapeHtml(s: string): string {
+  return (s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export interface LinkifyResult {
   links: LinkInfo[]
   primary: LinkInfo | null

@@ -2,7 +2,9 @@ import React, { useRef, useEffect, useState } from 'react'
 import { usePlanner } from '../store'
 import { GoalDot } from './primitives'
 import { linkify } from '@shared/taskMeta'
-import { DAY_SHORT } from '@shared/dates'
+import { DAY_SHORT, weekModel, weekBadge, currentWeekIndex } from '@shared/dates'
+import { ROUTINE_COLOR } from '@shared/routine'
+import { sanitizeHtml } from '../sanitize'
 import { COLORS } from '../tokens'
 
 function ToolButton({
@@ -36,9 +38,18 @@ export function TaskEditor(): React.JSX.Element | null {
   useEffect(() => {
     if (ed && notesRef.current && initKey.current !== key) {
       initKey.current = key
-      notesRef.current.innerHTML = ed.desc || ''
+      // Sanitize before injecting: desc is stored HTML and may include web-sourced text.
+      notesRef.current.innerHTML = sanitizeHtml(ed.desc || '')
     }
   }, [ed, key])
+
+  // Esc closes the modal (matches the calendar / context menus).
+  useEffect(() => {
+    if (!ed) return
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') closeEd() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [ed, closeEd])
 
   if (!ed) return null
 
@@ -92,7 +103,9 @@ export function TaskEditor(): React.JSX.Element | null {
           <input
             value={ed.title}
             onChange={(e) => edField('title', e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveEd() } }}
             placeholder="Название задачи"
+            autoFocus
             style={{ flex: 1, background: COLORS.appBg, border: `1px solid ${COLORS.border08}`, borderRadius: 10, padding: '11px 13px', color: COLORS.textPrimary, fontSize: 15, fontWeight: 500, outline: 'none' }}
           />
         </div>
@@ -144,6 +157,16 @@ export function TaskEditor(): React.JSX.Element | null {
 
         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', color: COLORS.textMuted, margin: '16px 0 8px' }}>ЦЕЛЬ</div>
         <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+          {/* Routine = no goal (cleaning, shopping, errands…). */}
+          {(() => {
+            const sel = !ed.goalId
+            return (
+              <div onClick={() => { edField('goalId', ''); edField('mId', '') }} title="Задача без цели" style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '7px 11px', borderRadius: 9, cursor: 'pointer', fontSize: 13, background: sel ? COLORS.accent13 : 'rgba(255,255,255,0.04)', border: sel ? '1px solid rgba(232,86,63,0.35)' : `1px solid ${COLORS.border08}`, color: sel ? COLORS.textPrimary : COLORS.textSecondary }}>
+                <GoalDot color={ROUTINE_COLOR} size={8} />
+                <span>Рутина</span>
+              </div>
+            )
+          })()}
           {goals.map((g) => {
             const sel = ed.goalId === g.id
             return (
@@ -163,6 +186,21 @@ export function TaskEditor(): React.JSX.Element | null {
               <div key={nm} onClick={() => edField('day', i)} style={{ minWidth: 40, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, background: sel ? COLORS.accent : 'rgba(255,255,255,0.04)', border: sel ? `1px solid ${COLORS.accent}` : `1px solid ${COLORS.border08}`, color: sel ? '#fff' : COLORS.textSecondary }}>{nm}</div>
             )
           })}
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', color: COLORS.textMuted, margin: '16px 0 8px' }}>НЕДЕЛЯ</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => edField('week', ed.week - 1)} title="Предыдущая неделя" style={{ width: 34, height: 34, flex: 'none', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'center' }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{weekModel(ed.week).range}</div>
+            {(() => {
+              const isCurrent = ed.week === currentWeekIndex()
+              return (
+                <div style={{ fontSize: 11.5, marginTop: 1, fontWeight: isCurrent ? 700 : 400, color: isCurrent ? COLORS.accent : COLORS.textFaint }}>{weekBadge(ed.week)}</div>
+              )
+            })()}
+          </div>
+          <button onClick={() => edField('week', ed.week + 1)} title="Следующая неделя" style={{ width: 34, height: 34, flex: 'none', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 22 }}>

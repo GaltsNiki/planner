@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { extractTime, extractLink, linkify, byTime, stripTime } from '../taskMeta'
+import { extractTime, extractLink, linkify, byTime, stripTime, escapeHtml } from '../taskMeta'
+
+describe('escapeHtml', () => {
+  it('neutralises markup so web-sourced text cannot execute', () => {
+    expect(escapeHtml('<img src=x onerror=alert(1)>')).toBe(
+      '&lt;img src=x onerror=alert(1)&gt;'
+    )
+    expect(escapeHtml(`a & b "c" 'd'`)).toBe('a &amp; b &quot;c&quot; &#39;d&#39;')
+  })
+  it('is a no-op for plain text', () => {
+    expect(escapeHtml('Кафе на Рубинштейна, 20')).toBe('Кафе на Рубинштейна, 20')
+  })
+})
 
 describe('extractTime', () => {
   it('extracts an HH:MM token', () => {

@@ -3,6 +3,7 @@
 
 import type { Goal, Task, LeisureSuggestion } from './types'
 import { goalStats } from './progress'
+import { LEISURE_GOAL_ID } from './leisure'
 
 /** A canned chat reply, grounded in the active goal's real progress. */
 export function chatReply(input: string, activeGoal: Goal, tasks: Task[]): string {
@@ -31,7 +32,7 @@ export function weeklyReview(goals: Goal[], tasks: Task[]): string {
   const done = tasks.filter((t) => t.done).length
   const total = tasks.length
   const topGoal = goals
-    .filter((g) => g.id !== 'g4')
+    .filter((g) => g.id !== LEISURE_GOAL_ID)
     .map((g) => ({ g, s: goalStats(g, tasks) }))
     .sort((a, b) => b.s.pct - a.s.pct)[0]
   const lead = topGoal

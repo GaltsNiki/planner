@@ -9,7 +9,8 @@ import { WeekAnalytics } from '../components/WeekAnalytics'
 import { WeekendIdeas } from '../components/WeekendIdeas'
 import { Calendar } from '../components/Calendar'
 import { useContextMenu, type MenuItem } from '../components/ContextMenu'
-import { weekModel, weekBadge, DAY_SHORT, offsetToDate, dateToOffset } from '@shared/dates'
+import { weekModel, weekBadge, DAY_SHORT, offsetToDate, dateToOffset, currentWeekIndex } from '@shared/dates'
+import { ROUTINE_GOAL } from '@shared/routine'
 import { COLORS } from '../tokens'
 import type { Task, Goal } from '@shared/types'
 
@@ -112,9 +113,9 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
   const { setNodeRef, isOver } = useDroppable({ id: 'day-' + dayIndex })
 
   const wm = weekModel(weekOffset)
-  const isToday = weekOffset === 0 && dayIndex === todayIndex
+  const isToday = weekOffset === currentWeekIndex() && dayIndex === todayIndex
   const isWeekend = dayIndex >= 5
-  const goalOf = (t: Task): Goal => goals.find((g) => g.id === t.goalId) || goals[0]
+  const goalOf = (t: Task): Goal => goals.find((g) => g.id === t.goalId) || ROUTINE_GOAL
 
   return (
     <div
@@ -148,7 +149,7 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
 }
 
 export function WeekView(): React.JSX.Element {
-  const { goals, tasks, weekOffset, todayIndex, shiftWeek, moveTask, reorderTask, deleteTask, selectGoal, deleteGoal } = usePlanner()
+  const { goals, tasks, weekOffset, todayIndex, shiftWeek, moveTask, reorderTask, deleteTask } = usePlanner()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const [dragId, setDragId] = useState<string | null>(null)
   const [cal, setCal] = useState<{ x: number; y: number } | null>(null)
@@ -159,12 +160,6 @@ export function WeekView(): React.JSX.Element {
       { label: 'Изменить', onClick: () => usePlanner.getState().openEditor(t.id) },
       { label: 'Удалить задачу', danger: true, onClick: () => deleteTask(t.id) }
     ]
-    const g = goals.find((x) => x.id === t.goalId)
-    if (g) {
-      items.push({ label: 'Открыть цель', onClick: () => selectGoal(g.id) })
-      items.push({ label: 'Изменить цель', onClick: () => usePlanner.getState().openEditGoal(g.id) })
-      items.push({ label: `Удалить цель «${g.title}»`, danger: true, onClick: () => deleteGoal(g.id) })
-    }
     return menu.open(items)
   }
 
@@ -186,7 +181,7 @@ export function WeekView(): React.JSX.Element {
   const dragGoal = dragTask ? goals.find((g) => g.id === dragTask.goalId) || goals[0] : null
 
   const rangeDate = offsetToDate(weekOffset, 0)
-  const today = offsetToDate(0, todayIndex)
+  const today = offsetToDate(currentWeekIndex(), todayIndex)
   const pickWeek = (d: Date): void => {
     const o = dateToOffset(d)
     shiftWeek(o.weekOffset - weekOffset)

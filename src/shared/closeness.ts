@@ -1,6 +1,21 @@
 // Milestone-based closeness → stepper segment states + label.
 
-import type { Goal, MilestoneStatus } from './types'
+import type { Goal, Milestone, MilestoneStatus } from './types'
+
+/**
+ * Apply a patch to the milestone `mId`, enforcing at most one `active` milestone:
+ * activating one demotes any other active stage back to `todo`. Keeps a linear
+ * stepper unambiguous (no two "В работе" stages, which also skewed goal progress).
+ */
+export function patchMilestones(
+  milestones: Milestone[],
+  mId: string,
+  patch: Partial<Milestone>
+): Milestone[] {
+  const next = milestones.map((m) => (m.id === mId ? { ...m, ...patch } : m))
+  if (patch.status !== 'active') return next
+  return next.map((m) => (m.id !== mId && m.status === 'active' ? { ...m, status: 'todo' } : m))
+}
 
 export interface StepSegment {
   title: string

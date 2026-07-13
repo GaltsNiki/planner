@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { usePlanner } from '../store'
-import { DAY_SHORT, weekModel, weekBadge } from '@shared/dates'
+import { DAY_SHORT, weekModel, weekBadge, currentWeekIndex } from '@shared/dates'
 import { COLORS } from '../tokens'
 import type { Habit } from '@shared/types'
 
@@ -9,8 +9,8 @@ const GRID = '220px repeat(7, 32px) 46px 30px'
 const CELL = 20 // small square marker, centered in each day column
 
 export function HabitsView(): React.JSX.Element {
-  const { habits, addHabit, todayIndex } = usePlanner()
-  const [wk, setWk] = useState(0)
+  // Share the app-wide week offset so switching tabs keeps you on the same week.
+  const { habits, addHabit, todayIndex, weekOffset: wk, shiftWeek } = usePlanner()
   const model = weekModel(wk)
 
   const navBtn: React.CSSProperties = { width: 32, height: 32, borderRadius: 9, background: COLORS.rowBg, border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
@@ -19,12 +19,12 @@ export function HabitsView(): React.JSX.Element {
     <div style={{ maxWidth: 620, margin: '0 auto' }}>
       {/* Week navigator */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-        <button className="row-hover" onClick={() => setWk((w) => w - 1)} style={navBtn}>‹</button>
+        <button className="row-hover" onClick={() => shiftWeek(-1)} style={navBtn}>‹</button>
         <div style={{ minWidth: 150, textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 700 }}>{model.range}</div>
           <div style={{ fontSize: 11.5, color: COLORS.textFaint, marginTop: 1 }}>{weekBadge(wk)}</div>
         </div>
-        <button className="row-hover" onClick={() => setWk((w) => w + 1)} style={navBtn}>›</button>
+        <button className="row-hover" onClick={() => shiftWeek(1)} style={navBtn}>›</button>
       </div>
 
       <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border06}`, borderRadius: 16, padding: '16px 18px 18px' }}>
@@ -32,7 +32,7 @@ export function HabitsView(): React.JSX.Element {
         <div style={{ display: 'grid', gridTemplateColumns: GRID, gap: 6, alignItems: 'end', marginBottom: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', color: COLORS.textFaint, paddingLeft: 2 }}>ПРИВЫЧКА</div>
           {DAY_SHORT.map((d, i) => {
-            const isToday = wk === 0 && i === todayIndex
+            const isToday = wk === currentWeekIndex() && i === todayIndex
             return (
               <div key={d} style={{ textAlign: 'center', lineHeight: 1.2 }}>
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: isToday ? COLORS.accent : COLORS.textMuted }}>{d}</div>
@@ -91,7 +91,7 @@ function HabitRow({ habit, weekOffset }: { habit: Habit; weekOffset: number }): 
       {[0, 1, 2, 3, 4, 5, 6].map((i) => {
         const key = `${weekOffset}:${i}`
         const done = habit.done.includes(key)
-        const isToday = weekOffset === 0 && i === todayIndex
+        const isToday = weekOffset === currentWeekIndex() && i === todayIndex
         return (
           <div
             key={i}

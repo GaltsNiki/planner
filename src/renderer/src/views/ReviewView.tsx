@@ -3,21 +3,24 @@ import { usePlanner } from '../store'
 import { ClaudeMark, GoalDot } from '../components/primitives'
 import { goalStats } from '@shared/progress'
 import { stepSegments } from '@shared/closeness'
-import { staleRows } from '@shared/staleness'
+import { staleRows, computeStale } from '@shared/staleness'
 import { COLORS } from '../tokens'
 
 export function ReviewView(): React.JSX.Element {
-  const { goals, tasks, stale, selectGoal, openChat, breakDown } = usePlanner()
+  const { goals, tasks, selectGoal, openChat, breakDown } = usePlanner()
   const [summary, setSummary] = useState('')
 
-  // The weekly summary comes from the mocked Claude "review" call.
+  // The weekly summary comes from the Claude "review" call. Debounced so that
+  // toggling tasks on this screen doesn't fire a fresh (paid) request per click.
   useEffect(() => {
     let active = true
-    void window.planner.review(goals, tasks).then((r) => { if (active) setSummary(r) })
-    return () => { active = false }
+    const id = setTimeout(() => {
+      void window.planner.review(goals, tasks).then((r) => { if (active) setSummary(r) })
+    }, 800)
+    return () => { active = false; clearTimeout(id) }
   }, [goals, tasks])
 
-  const staleList = staleRows(stale, goals)
+  const staleList = staleRows(computeStale(tasks), goals)
 
   return (
     <div style={{ maxWidth: 940, margin: '0 auto' }}>

@@ -43,10 +43,11 @@ describe('dayIndexOf / mondayOf', () => {
 })
 
 describe('weekBadge', () => {
-  it('labels current/past/future', () => {
-    expect(weekBadge(0)).toBe('Текущая неделя')
-    expect(weekBadge(-1)).toBe('Прошлая неделя')
-    expect(weekBadge(2)).toBe('Будущая неделя')
+  it('labels current/past/future relative to the current absolute week index', () => {
+    const current = 300
+    expect(weekBadge(current, current)).toBe('Текущая неделя')
+    expect(weekBadge(current - 1, current)).toBe('Прошлая неделя')
+    expect(weekBadge(current + 2, current)).toBe('Будущая неделя')
   })
 })
 
