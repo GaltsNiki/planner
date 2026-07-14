@@ -85,11 +85,39 @@ export function seedData(): PlannerData {
       location: 'Санкт-Петербург',
       interests: ['театр', 'природа', 'музыка', 'кофе']
     },
+    // Habit completions span the current week (offset 0) and the four prior weeks
+    // (−1…−4) so the adherence analytics — streaks, 7/30-day rates, the consistency
+    // heatmap — have real history to show on a fresh install. Offsets are relative;
+    // migrate() rebases them onto the current calendar week.
     habits: [
-      { id: 'h1', title: 'Зарядка утром', done: ['0:0', '0:1', '0:3'] },
-      { id: 'h2', title: 'Читать 20 минут', done: ['0:0', '0:2', '0:3', '0:4'] },
-      { id: 'h3', title: 'Без сахара', done: ['0:1'] },
-      { id: 'h4', title: 'Медитация', done: [] }
+      {
+        id: 'h1', title: 'Зарядка утром',
+        done: [
+          '0:0', '0:1', '0:3',
+          '-1:0', '-1:1', '-1:2', '-1:3', '-1:4',
+          '-2:0', '-2:2', '-2:3',
+          '-3:1', '-3:2', '-3:4', '-3:5',
+          '-4:0', '-4:1', '-4:2'
+        ]
+      },
+      {
+        id: 'h2', title: 'Читать 20 минут',
+        done: [
+          '0:0', '0:2', '0:3', '0:4',
+          '-1:0', '-1:1', '-1:2', '-1:3', '-1:4', '-1:5', '-1:6',
+          '-2:0', '-2:1', '-2:2', '-2:3', '-2:4',
+          '-3:0', '-3:1', '-3:3', '-3:4', '-3:6',
+          '-4:2', '-4:3', '-4:4', '-4:5'
+        ]
+      },
+      {
+        id: 'h3', title: 'Без сахара',
+        done: ['0:1', '-1:2', '-1:5', '-2:1', '-2:6', '-3:3', '-4:0']
+      },
+      {
+        id: 'h4', title: 'Медитация',
+        done: ['-1:0', '-1:1', '-2:3', '-3:2', '-3:3']
+      }
     ]
   })
 }
