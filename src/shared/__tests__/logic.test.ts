@@ -21,11 +21,16 @@ const goal: Goal = {
 }
 
 describe('stepSegments', () => {
-  it('colours segments by status', () => {
+  it('colours segments by status, defaulting to the coral accent', () => {
     const s = stepSegments(goal)
-    expect(s[0].color).toBe('#E8563F')
-    expect(s[1].color).toBe('rgba(232,86,63,0.5)')
-    expect(s[2].muted).toBe(true)
+    expect(s[0].color).toBe('#E8563F')                                    // done → full accent
+    expect(s[1].color).toBe('color-mix(in oklab, #E8563F 50%, transparent)') // active → half accent
+    expect(s[2].muted).toBe(true)                                          // todo → muted rail
+  })
+  it('tints segments with a supplied sphere accent', () => {
+    const s = stepSegments(goal, 'oklch(0.7 0.13 250)')
+    expect(s[0].color).toBe('oklch(0.7 0.13 250)')
+    expect(s[1].color).toBe('color-mix(in oklab, oklch(0.7 0.13 250) 50%, transparent)')
   })
 })
 

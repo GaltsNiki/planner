@@ -31,7 +31,9 @@ export function GoalDetail(): React.JSX.Element {
   }
 
   const st = goalStats(ag, tasks)
-  const segments = stepSegments(ag)
+  // Colour the stage bar and the progress ring in the goal's (sphere's) colour,
+  // so an opened goal keeps the same colour identity it has in the Обзор view.
+  const segments = stepSegments(ag, ag.dotColor)
   const deg = st.pct * 3.6
 
   return (
@@ -53,7 +55,7 @@ export function GoalDetail(): React.JSX.Element {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
               Изменить
             </button>
-            <div style={{ width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `conic-gradient(#E8563F ${deg}deg, rgba(255,255,255,0.08) ${deg}deg)` }}>
+            <div style={{ width: 72, height: 72, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `conic-gradient(${ag.dotColor} ${deg}deg, rgba(255,255,255,0.08) ${deg}deg)` }}>
               <div style={{ width: 56, height: 56, borderRadius: '50%', background: COLORS.cardBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700 }}>{st.pct}%</div>
             </div>
           </div>

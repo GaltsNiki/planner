@@ -27,15 +27,33 @@ export interface StepSegment {
 }
 
 const ACCENT = '#E8563F'
-const ACCENT_ACTIVE = 'rgba(232,86,63,0.5)'
 const TODO = 'rgba(255,255,255,0.08)'
 
-/** Stepper segments for a goal's milestones, matching the prototype's `steps()`. */
-export function stepSegments(goal: Goal): StepSegment[] {
+/**
+ * Segment fill for a milestone status, tinted with the goal's own accent so a
+ * goal's progress bar reads in its sphere's colour (not a fixed coral):
+ *   done   → full accent
+ *   active → half-opacity accent (a hint the stage is in progress)
+ *   todo   → neutral rail
+ * `accent` accepts hex or oklch; the active tint is layered over it so any format
+ * works without parsing. Defaults to the app's coral for callers that don't pass one.
+ */
+function segmentColor(status: MilestoneStatus, accent: string): string {
+  if (status === 'done') return accent
+  if (status === 'active') return `color-mix(in oklab, ${accent} 50%, transparent)`
+  return TODO
+}
+
+/**
+ * Stepper segments for a goal's milestones, matching the prototype's `steps()`.
+ * Pass `accent` to colour the segments in the goal's / sphere's colour; omit it
+ * to keep the historical coral accent (used where no sphere colour is at hand).
+ */
+export function stepSegments(goal: Goal, accent: string = ACCENT): StepSegment[] {
   return goal.milestones.map((m) => ({
     title: m.title,
     status: m.status,
-    color: m.status === 'done' ? ACCENT : m.status === 'active' ? ACCENT_ACTIVE : TODO,
+    color: segmentColor(m.status, accent),
     muted: m.status === 'todo'
   }))
 }
