@@ -25,7 +25,7 @@ export function GoalDetail(): React.JSX.Element {
     return (
       <div style={{ maxWidth: 820, margin: '60px auto 0', textAlign: 'center', color: COLORS.textMuted }}>
         <div style={{ fontSize: 15, marginBottom: 14 }}>Целей пока нет.</div>
-        <button onClick={openNewGoal} style={{ padding: '10px 18px', borderRadius: 10, background: COLORS.accent, border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>Создать цель</button>
+        <button onClick={() => openNewGoal()} style={{ padding: '10px 18px', borderRadius: 10, background: COLORS.accent, border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>Создать цель</button>
       </div>
     )
   }

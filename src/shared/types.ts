@@ -13,7 +13,16 @@ export interface Milestone {
 export interface Goal {
   id: string
   title: string
+  /**
+   * Denormalised sphere label, kept in sync with the goal's sphere (see sphereId).
+   * Retained for back-compat: the AI context and headers read it directly.
+   */
   category: string
+  /**
+   * The life-sphere this goal belongs to. Optional so pre-existing goals stay
+   * valid; a missing/dangling id resolves to the UNSORTED sphere (see spheres.ts).
+   */
+  sphereId?: string
   /** Per-goal accent colour (hex or oklch), from the design palette. */
   dotColor: string
   milestones: Milestone[]
@@ -57,6 +66,14 @@ export interface Habit {
   done: string[]
 }
 
+/** A sphere of life (career, health, sport, …) that groups goals. */
+export interface Sphere {
+  id: string
+  title: string
+  /** Accent colour (hex or oklch), from the design palette. Goals in the sphere share it. */
+  color: string
+}
+
 export interface StaleTask {
   id: string
   goalId: string
@@ -81,6 +98,8 @@ export interface Settings {
 /** The full persisted document. */
 export interface PlannerData {
   goals: Goal[]
+  /** Life-spheres that group goals. Derived from goal categories in migration v2. */
+  spheres: Sphere[]
   tasks: Task[]
   stale: StaleTask[]
   chats: ChatMap

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { usePlanner, GOAL_COLORS } from '../store'
+import { usePlanner } from '../store'
 import { GoalDot } from './primitives'
 import { Calendar, fmtDay } from './Calendar'
 import { COLORS } from '../tokens'
@@ -43,10 +43,14 @@ function dateToIso(d: Date): string {
 
 export function GoalEditor(): React.JSX.Element | null {
   const {
-    goalEd: gd, goalEdField, closeGoalEd, saveGoalEd, deleteGoalEd,
-    goalEdAddMilestone, goalEdUpdateMilestone, goalEdRemoveMilestone, goalEdMoveMilestone
+    goalEd: gd, goalEdField, goalEdPickSphere, closeGoalEd, saveGoalEd, deleteGoalEd,
+    goalEdAddMilestone, goalEdUpdateMilestone, goalEdRemoveMilestone, goalEdMoveMilestone,
+    spheres, addSphere
   } = usePlanner()
   const [cal, setCal] = useState<{ x: number; y: number } | null>(null)
+  // Inline "new sphere" creation from within the picker.
+  const [creatingSphere, setCreatingSphere] = useState(false)
+  const [newSphereTitle, setNewSphereTitle] = useState('')
   // Guard against closing when a text-selection drag merely ends on the backdrop.
   const downOnBackdrop = useRef(false)
 
@@ -89,23 +93,60 @@ export function GoalEditor(): React.JSX.Element | null {
           style={{ ...inputStyle, fontSize: 15.5, fontWeight: 600 }}
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div>
-            <div style={labelStyle}>КАТЕГОРИЯ</div>
-            <input value={gd.category} onChange={(e) => goalEdField('category', e.target.value)} placeholder="Здоровье, Карьера…" style={inputStyle} />
-          </div>
-          <div>
-            <div style={labelStyle}>ЦВЕТ</div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', height: 40 }}>
-              {GOAL_COLORS.map((c) => (
-                <div
-                  key={c}
-                  onClick={() => goalEdField('dotColor', c)}
-                  style={{ width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer', boxShadow: gd.dotColor === c ? `0 0 0 2px ${COLORS.cardBg}, 0 0 0 4px ${c}` : 'none' }}
-                />
-              ))}
-            </div>
-          </div>
+        {/* Sphere of life — which life area this goal belongs to. */}
+        <div style={labelStyle}>СФЕРА ЖИЗНИ <span style={hintStyle}>— область жизни, к которой относится цель</span></div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {spheres.map((sp) => {
+            const sel = gd.sphereId === sp.id
+            return (
+              <button
+                key={sp.id}
+                onClick={() => goalEdPickSphere(sp.id)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 12px', borderRadius: 20,
+                  background: sel ? COLORS.accent14 : COLORS.border06,
+                  border: `1px solid ${sel ? COLORS.accent28 : COLORS.border08}`,
+                  color: sel ? COLORS.accent : COLORS.textSecondary, fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                }}
+              >
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: sp.color, flex: 'none' }} />
+                {sp.title}
+              </button>
+            )
+          })}
+          {creatingSphere ? (
+            <input
+              autoFocus
+              value={newSphereTitle}
+              onChange={(e) => setNewSphereTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newSphereTitle.trim()) {
+                  const id = addSphere(newSphereTitle.trim())
+                  goalEdPickSphere(id)
+                  setCreatingSphere(false); setNewSphereTitle('')
+                } else if (e.key === 'Escape') {
+                  setCreatingSphere(false); setNewSphereTitle('')
+                }
+              }}
+              onBlur={() => {
+                if (newSphereTitle.trim()) {
+                  const id = addSphere(newSphereTitle.trim())
+                  goalEdPickSphere(id)
+                }
+                setCreatingSphere(false); setNewSphereTitle('')
+              }}
+              placeholder="Название сферы"
+              style={{ ...inputStyle, width: 170 }}
+            />
+          ) : (
+            <button
+              onClick={() => setCreatingSphere(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 20, background: 'transparent', border: `1px dashed ${COLORS.borderDash}`, color: COLORS.textFaint, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
+              Новая сфера
+            </button>
+          )}
         </div>
 
         {/* M — Measurable */}

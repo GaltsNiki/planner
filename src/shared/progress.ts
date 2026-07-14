@@ -43,6 +43,21 @@ export function pctDone(tasks: Task[]): number {
   return Math.round((tasks.filter((t) => t.done).length / tasks.length) * 100)
 }
 
+export interface SphereStats {
+  pct: number
+  goalCount: number
+}
+
+/**
+ * Aggregate progress for a sphere: the mean of its goals' goalStats().pct.
+ * The caller passes the goals already grouped into this sphere. Empty ⇒ 0.
+ */
+export function sphereStatsOf(sphereGoals: Goal[], tasks: Task[]): SphereStats {
+  if (!sphereGoals.length) return { pct: 0, goalCount: 0 }
+  const sum = sphereGoals.reduce((acc, g) => acc + goalStats(g, tasks).pct, 0)
+  return { pct: Math.round(sum / sphereGoals.length), goalCount: sphereGoals.length }
+}
+
 export interface WeekGoalStat {
   goalId: string
   title: string

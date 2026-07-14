@@ -1,7 +1,7 @@
 import React from 'react'
 import { usePlanner } from '../store'
 import { goalStats } from '@shared/progress'
-import { GoalDot } from './primitives'
+import { resolveSphereId, UNSORTED_SPHERE_ID } from '@shared/spheres'
 import { useContextMenu } from './ContextMenu'
 import { COLORS } from '../tokens'
 import type { View } from '@shared/types'
@@ -26,7 +26,10 @@ function NavItem({
 }
 
 export function Sidebar(): React.JSX.Element {
-  const { goals, tasks, view, activeGoalId, setView, selectGoal, deleteGoal, openNewGoal, openEditGoal, toggleSidebar, openSettings, hasApiKey } = usePlanner()
+  const {
+    goals, spheres, tasks, view, activeGoalId, setView, selectGoal, deleteGoal,
+    openEditGoal, toggleSidebar, openSettings, hasApiKey
+  } = usePlanner()
 
   const icons: Record<Exclude<View, 'goal'>, React.JSX.Element> = {
     today: (
@@ -79,42 +82,56 @@ export function Sidebar(): React.JSX.Element {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', margin: '22px 8px 8px' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled }}>МОИ ЦЕЛИ</div>
-        <button
-          onClick={openNewGoal}
-          title="Новая цель"
-          className="row-hover"
-          style={{ marginLeft: 'auto', width: 22, height: 22, borderRadius: 6, background: 'transparent', border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
-        </button>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled }}>СФЕРЫ ЖИЗНИ</div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-        {goals.map((g) => {
-          const st = goalStats(g, tasks)
-          const active = view === 'goal' && activeGoalId === g.id
-          return (
-            <div
-              key={g.id}
-              onClick={() => selectGoal(g.id)}
-              onContextMenu={menu.open([
-                { label: 'Открыть цель', onClick: () => selectGoal(g.id) },
-                { label: 'Изменить цель', onClick: () => openEditGoal(g.id) },
-                { label: 'Удалить цель', danger: true, onClick: () => deleteGoal(g.id) }
-              ])}
-              style={{ padding: '9px 10px', borderRadius: 10, cursor: 'pointer', background: active ? 'rgba(255,255,255,0.05)' : 'transparent' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <GoalDot color={g.dotColor} size={9} />
-                <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: '#e6e6e8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</div>
-                <div style={{ fontSize: 11.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{st.mDone}/{st.mTotal}</div>
+        {spheres
+          .map((sp) => ({ sphere: sp, own: goals.filter((g) => resolveSphereId(g, spheres) === sp.id) }))
+          // Hide the "Разное" fallback group unless it actually holds goals.
+          .filter((grp) => grp.sphere.id !== UNSORTED_SPHERE_ID || grp.own.length > 0)
+          .map(({ sphere: sp, own }) => {
+            return (
+              <div key={sp.id} style={{ marginBottom: 6 }}>
+                {/* Sphere header — read-only here; spheres and their goals are
+                    created in the Обзор view, not from the sidebar. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px' }}>
+                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: sp.color, flex: 'none' }} />
+                  <div
+                    style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  >
+                    {sp.title.toUpperCase()}
+                  </div>
+                </div>
+
+                {/* Goals in this sphere — no goal dot; the title and bar are indented
+                    to line up under the sphere name. */}
+                {own.map((g) => {
+                  const st = goalStats(g, tasks)
+                  const active = view === 'goal' && activeGoalId === g.id
+                  return (
+                    <div
+                      key={g.id}
+                      onClick={() => selectGoal(g.id)}
+                      onContextMenu={menu.open([
+                        { label: 'Открыть цель', onClick: () => selectGoal(g.id) },
+                        { label: 'Изменить цель', onClick: () => openEditGoal(g.id) },
+                        { label: 'Удалить цель', danger: true, onClick: () => deleteGoal(g.id) }
+                      ])}
+                      style={{ padding: '9px 10px 9px 26px', borderRadius: 10, cursor: 'pointer', background: active ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                        <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: '#e6e6e8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</div>
+                        <div style={{ fontSize: 11.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{st.pct}%</div>
+                      </div>
+                      <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 2, background: g.dotColor, width: st.pct + '%' }} />
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: 2, background: g.dotColor, width: st.pct + '%' }} />
-              </div>
-            </div>
-          )
-        })}
+            )
+          })}
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 12, borderTop: `1px solid ${COLORS.border}` }}>

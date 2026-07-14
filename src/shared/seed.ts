@@ -8,6 +8,9 @@ import { migrate } from './migrate'
 
 export function seedData(): PlannerData {
   return migrate({
+    // Spheres are derived from the goals' categories by migrate() (v2 step),
+    // so the seed lists none — the migration is the single source of truth.
+    spheres: [],
     goals: [
       {
         id: 'g1', title: 'Прийти в форму', category: 'Здоровье', dotColor: '#E8563F',

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+</style>
+</helmet>
+
+<div style="width:1024px;height:1024px;border-radius:224px;background:linear-gradient(135deg,#E8563F,#f0855f);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;box-shadow:inset 0 -40px 90px rgba(0,0,0,0.18),inset 0 30px 60px rgba(255,255,255,0.12)">
+  <div style="position:absolute;width:640px;height:640px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,0.18),rgba(255,255,255,0) 60%)"></div>
+
+  <!-- aim / target motif — rings only, fully behind and clear of the list card -->
+  <div style="position:absolute;width:940px;height:940px;border-radius:50%;border:30px solid rgba(255,255,255,0.15)"></div>
+  <div style="position:absolute;width:760px;height:760px;border-radius:50%;border:26px solid rgba(255,255,255,0.2)"></div>
+
+  <!-- list card -->
+  <div style="width:400px;height:400px;background:#ffffff;border-radius:64px;box-shadow:0 28px 70px rgba(120,40,20,0.35);display:flex;flex-direction:column;justify-content:center;gap:40px;padding:0 56px">
+    <div style="display:flex;align-items:center;gap:26px">
+      <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#E8563F,#f0855f);flex:none"></div>
+      <div style="flex:1;height:26px;border-radius:13px;background:#e3e0dc"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:26px">
+      <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#E8563F,#f0855f);flex:none"></div>
+      <div style="flex:1;height:26px;border-radius:13px;background:#e3e0dc"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:26px">
+      <div style="width:44px;height:44px;border-radius:50%;background:#f0ede8;flex:none"></div>
+      <div style="flex:1;height:26px;border-radius:13px;background:#efece7"></div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1024,&quot;height&quot;:1024}}"></script>
+</body>
+</html>

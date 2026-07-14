@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { goalStats, pctDone, weekAnalytics } from '../progress'
+import { goalStats, pctDone, weekAnalytics, sphereStatsOf } from '../progress'
 import type { Goal, Task } from '../types'
 
 const goal: Goal = {
@@ -43,6 +43,22 @@ describe('goalStats', () => {
     const g2: Goal = { ...goal, milestones: [] }
     expect(goalStats(g2, [mk({ done: true }), mk({ done: false })]).pct).toBe(50)
     expect(goalStats(g2, []).pct).toBe(0)
+  })
+})
+
+describe('sphereStatsOf', () => {
+  // goal (m1 done / m2 active / m3 todo) with no tasks → 33%.
+  // A single done milestone → 100%.
+  const g100: Goal = { ...goal, id: 'g100', milestones: [{ id: 'm1', title: 'a', status: 'done' }] }
+
+  it('averages its goals goalStats().pct (rounded)', () => {
+    // 33 and 100 → mean 66.5 → rounds to 67; goalCount 2.
+    const s = sphereStatsOf([goal, g100], [])
+    expect(s).toEqual({ pct: 67, goalCount: 2 })
+  })
+
+  it('is 0 for an empty sphere', () => {
+    expect(sphereStatsOf([], [])).toEqual({ pct: 0, goalCount: 0 })
   })
 })
 

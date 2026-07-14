@@ -3,9 +3,7 @@ import { usePlanner } from '../store'
 import { TaskRow } from '../components/TaskRow'
 import { GoalDot } from '../components/primitives'
 import { Calendar, fmtDay } from '../components/Calendar'
-import { useContextMenu } from '../components/ContextMenu'
-import { byTime } from '@shared/taskMeta'
-import { ROUTINE_GOAL } from '@shared/routine'
+import { dailyItems } from '@shared/dailyOrder'
 import { staleRows, computeStale } from '@shared/staleness'
 import { DAY_FULL, offsetToDate, dateToOffset, currentWeekIndex } from '@shared/dates'
 import { COLORS } from '../tokens'
@@ -59,37 +57,17 @@ function DateNavigator(): React.JSX.Element {
 }
 
 export function TodayView(): React.JSX.Element {
-  const { goals, tasks, dayIndex, weekOffset, selectGoal, deleteGoal, openEditGoal, openNew, breakDown } = usePlanner()
-  const menu = useContextMenu()
+  const { goals, tasks, dayIndex, weekOffset, selectGoal, openNew, breakDown } = usePlanner()
 
   const todayTasks = tasks.filter((t) => t.day === dayIndex && (t.week || 0) === weekOffset)
   const tDone = todayTasks.filter((t) => t.done).length
   const tTotal = todayTasks.length
   const todayPct = tTotal ? Math.round((tDone / tTotal) * 100) : 0
 
-  // Group today's tasks by their stage (milestone), so the header over the
-  // tasks is the stage — not the goal (the goal name shows as a subtitle).
-  const stageGroups = goals.flatMap((goal) => {
-    const gTasks = todayTasks.filter((t) => t.goalId === goal.id)
-    if (!gTasks.length) return []
-    const mIds = new Set(goal.milestones.map((m) => m.id))
-    const byStage = goal.milestones
-      .map((m) => ({
-        goal, key: `${goal.id}:${m.id}`, stageTitle: m.title as string | null,
-        tasks: gTasks.filter((t) => t.mId === m.id).slice().sort(byTime)
-      }))
-      .filter((g) => g.tasks.length)
-    // Tasks whose stage no longer exists fall back to a goal-titled group.
-    const loose = gTasks.filter((t) => !mIds.has(t.mId)).slice().sort(byTime)
-    if (loose.length) byStage.push({ goal, key: `${goal.id}:none`, stageTitle: null, tasks: loose })
-    return byStage
-  })
-
-  // Routine tasks: not attached to any existing goal.
-  const routineTasks = todayTasks
-    .filter((t) => !goals.some((g) => g.id === t.goalId))
-    .slice()
-    .sort(byTime)
+  // The whole day is one strict-time agenda: every task (goal or routine) sorted
+  // by its time, each row labelled with its stage · goal. So a 07:00 task is first
+  // and a 19:30 task sits in sequence regardless of which stage it belongs to.
+  const dayItems = dailyItems(goals, todayTasks)
 
   const staleList = staleRows(computeStale(tasks), goals)
 
@@ -107,37 +85,17 @@ export function TodayView(): React.JSX.Element {
         </div>
       </div>
 
-      {stageGroups.map(({ goal, key, stageTitle, tasks: groupTasks }) => (
-        <div key={key} style={{ marginBottom: 26 }}>
-          <div
-            onClick={() => selectGoal(goal.id)}
-            onContextMenu={menu.open([
-              { label: 'Открыть цель', onClick: () => selectGoal(goal.id) },
-              { label: 'Изменить цель', onClick: () => openEditGoal(goal.id) },
-              { label: 'Удалить цель', danger: true, onClick: () => deleteGoal(goal.id) }
-            ])}
-            style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 0 12px 2px', cursor: 'pointer' }}
-          >
-            <GoalDot color={goal.dotColor} size={9} />
-            <div style={{ fontSize: 14.5, fontWeight: 600 }}>{stageTitle ?? goal.title}</div>
-            {stageTitle && <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>· {goal.title}</div>}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {groupTasks.map((task) => <TaskRow key={task.id} task={task} goal={goal} />)}
-          </div>
-        </div>
-      ))}
-
-      {/* Routine — tasks without a goal (cleaning, shopping, errands…). */}
-      {routineTasks.length > 0 && (
-        <div style={{ marginBottom: 26 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 0 12px 2px' }}>
-            <GoalDot color={ROUTINE_GOAL.dotColor} size={9} />
-            <div style={{ fontSize: 14.5, fontWeight: 600 }}>{ROUTINE_GOAL.title}</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {routineTasks.map((task) => <TaskRow key={task.id} task={task} goal={ROUTINE_GOAL} />)}
-          </div>
+      {dayItems.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 26 }}>
+          {dayItems.map(({ task, goal, caption, isRoutine }) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              goal={goal}
+              caption={caption}
+              onCaption={isRoutine ? undefined : () => selectGoal(goal.id)}
+            />
+          ))}
         </div>
       )}
 
@@ -148,7 +106,7 @@ export function TodayView(): React.JSX.Element {
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '13px 15px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 13, cursor: 'pointer', color: COLORS.textFaint, fontSize: 14, marginBottom: 26 }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>
-        <span>{stageGroups.length || routineTasks.length ? 'Добавить задачу' : 'На этот день пока нет задач — добавить'}</span>
+        <span>{dayItems.length ? 'Добавить задачу' : 'На этот день пока нет задач — добавить'}</span>
       </div>
 
       {staleList.length > 0 && (
@@ -171,8 +129,6 @@ export function TodayView(): React.JSX.Element {
         </div>
       </div>
       )}
-
-      {menu.element}
     </div>
   )
 }

@@ -29,6 +29,9 @@ export function deserialize(raw: string): PlannerData | null {
   const seed = seedData()
   return {
     goals: parsed.goals ?? seed.goals,
+    // Backfill an EMPTY array (not seed spheres) so a pre-v2 doc lets migrate()
+    // derive the user's own spheres from their categories instead of inheriting seed ones.
+    spheres: parsed.spheres ?? [],
     tasks: parsed.tasks ?? seed.tasks,
     stale: parsed.stale ?? seed.stale,
     chats: parsed.chats ?? seed.chats,

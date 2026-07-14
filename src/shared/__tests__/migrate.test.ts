@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { migrate, DATA_VERSION } from '../migrate'
 import { currentWeekIndex } from '../dates'
-import type { PlannerData, Task, Habit } from '../types'
+import { GOAL_COLORS } from '../palette'
+import { UNSORTED_SPHERE_ID } from '../spheres'
+import type { PlannerData, Task, Habit, Goal } from '../types'
 
 const now = new Date(2026, 6, 15) // Wed, 15 Jul 2026
 const base = currentWeekIndex(now)
@@ -10,9 +12,12 @@ const task = (over: Partial<Task>): Task => ({
   id: 't', goalId: 'g1', mId: 'm1', title: 't', desc: '', done: false, day: 0, week: 0, ...over
 })
 const habit = (done: string[]): Habit => ({ id: 'h', title: 'h', done })
+const goal = (over: Partial<Goal>): Goal => ({
+  id: 'g', title: 'g', category: '', dotColor: '#fff', milestones: [], closenessLabel: '', claudeTake: '', ...over
+})
 
 const preMigration: PlannerData = {
-  goals: [], stale: [], chats: {}, settings: {},
+  goals: [], spheres: [], stale: [], chats: {}, settings: {},
   tasks: [task({ week: 0, day: 2 }), task({ id: 't2', week: 1, day: 0 }), task({ id: 't3', week: -1, day: 5 })],
   habits: [habit(['0:2', '1:0', '-1:6'])]
 }
@@ -49,5 +54,55 @@ describe('migrate v1: relative → absolute weeks (freeze)', () => {
     expect(fixedWeek).toBe(currentWeekIndex(weekLater) - 1)
     // Re-running migration later is a no-op (version already current) — no further shift.
     expect(migrate(m, weekLater).tasks[0].week).toBe(fixedWeek)
+  })
+})
+
+describe('migrate v2: derive life-spheres from goal categories', () => {
+  const withGoals: PlannerData = {
+    goals: [
+      goal({ id: 'g1', category: 'Карьера' }),
+      goal({ id: 'g2', category: 'Здоровье' }),
+      goal({ id: 'g3', category: ' карьера ' }), // same sphere as g1 (case/whitespace)
+      goal({ id: 'g4', category: '' })            // no category → UNSORTED
+    ],
+    spheres: [], tasks: [], stale: [], chats: {}, settings: {}, habits: []
+  }
+
+  it('collapses goals with the same category into one sphere', () => {
+    const m = migrate(withGoals, now)
+    const g1 = m.goals.find((g) => g.id === 'g1')!
+    const g3 = m.goals.find((g) => g.id === 'g3')!
+    expect(g1.sphereId).toBe(g3.sphereId)
+    // Two named spheres (Карьера, Здоровье) + the UNSORTED fallback = 3.
+    expect(m.spheres).toHaveLength(3)
+  })
+
+  it('points each goal at the sphere matching its category', () => {
+    const m = migrate(withGoals, now)
+    const byId = (id: string): (typeof m.spheres)[number] | undefined =>
+      m.spheres.find((s) => s.id === m.goals.find((g) => g.id === id)!.sphereId)
+    expect(byId('g1')!.title).toBe('Карьера')
+    expect(byId('g2')!.title).toBe('Здоровье')
+  })
+
+  it('routes an empty-category goal to the UNSORTED sphere', () => {
+    const m = migrate(withGoals, now)
+    expect(m.goals.find((g) => g.id === 'g4')!.sphereId).toBe(UNSORTED_SPHERE_ID)
+  })
+
+  it('colours derived spheres from the palette', () => {
+    const m = migrate(withGoals, now)
+    const named = m.spheres.filter((s) => s.id !== UNSORTED_SPHERE_ID)
+    for (const s of named) expect(GOAL_COLORS).toContain(s.color)
+  })
+
+  it('stamps version 2', () => {
+    expect(migrate(withGoals, now).version).toBe(2)
+    expect(DATA_VERSION).toBe(2)
+  })
+
+  it('is idempotent — goals with a sphereId are left untouched', () => {
+    const once = migrate(withGoals, now)
+    expect(migrate(once, now)).toEqual(once)
   })
 })

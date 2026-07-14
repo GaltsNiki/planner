@@ -6,7 +6,9 @@ import { COLORS } from '../tokens'
 import type { Task, Goal } from '@shared/types'
 
 /** Click-to-edit task row with a delete button + right-click delete, used in the Today view. */
-export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.Element {
+export function TaskRow({
+  task, goal, caption, onCaption
+}: { task: Task; goal: Goal; caption?: string; onCaption?: () => void }): React.JSX.Element {
   const { toggleTask, deleteTask, openEditor } = usePlanner()
   const menu = useContextMenu()
   const [hover, setHover] = useState(false)
@@ -43,6 +45,19 @@ export function TaskRow({ task, goal }: { task: Task; goal: Goal }): React.JSX.E
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
+        {caption && (
+          <div
+            onClick={onCaption ? (e) => { stop(e); onCaption() } : undefined}
+            title={onCaption ? 'Открыть цель' : undefined}
+            // Styled as an eyebrow label (uppercase, tracked, bold) and tinted with the
+            // goal's own accent colour so it reads as the task's goal/stage tag — not as
+            // another line of muted description text (which shares textMuted grey).
+            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.7px', textTransform: 'uppercase', color: goal.dotColor, marginBottom: 5, cursor: onCaption ? 'pointer' : 'default', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', flex: 'none', background: goal.dotColor }} />
+            {caption}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           {time && (
             <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 7, background: COLORS.accent14, color: COLORS.accentPartner, fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{time}</span>

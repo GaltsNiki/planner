@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import type {
-  Goal, Task, StaleTask, ChatMap, Settings, View, PlannerData, Milestone, MilestoneStatus, Habit
+  Goal, Task, StaleTask, ChatMap, Settings, View, PlannerData, Milestone, MilestoneStatus, Habit, Sphere
 } from '@shared/types'
 import { todayDayIndex, currentWeekIndex } from '@shared/dates'
 import { deriveClosenessLabel, patchMilestones } from '@shared/closeness'
 import { escapeHtml } from '@shared/taskMeta'
 import { findLeisureGoal } from '@shared/leisure'
+import { GOAL_COLORS as PALETTE } from '@shared/palette'
+import { UNSORTED_SPHERE_ID, UNSORTED_SPHERE_TITLE, UNSORTED_SPHERE_COLOR, resolveSphereId } from '@shared/spheres'
 
 export interface EditorDraft {
   isNew: boolean
@@ -24,7 +26,7 @@ export interface GoalDraft {
   isNew: boolean
   id: string | null
   title: string        // S — Specific
-  category: string
+  sphereId: string     // the life-sphere this goal belongs to
   dotColor: string
   measurable: string   // M
   achievable: string   // A
@@ -33,19 +35,14 @@ export interface GoalDraft {
   milestones: Milestone[]
 }
 
-/** Accent palette offered in the goal editor. */
-export const GOAL_COLORS = [
-  '#E8563F',
-  'oklch(0.7 0.13 250)',
-  'oklch(0.72 0.15 150)',
-  'oklch(0.7 0.13 300)',
-  'oklch(0.75 0.14 90)',
-  'oklch(0.68 0.15 20)'
-]
+/** Accent palette offered in the goal editor. Re-exported from @shared so the
+ *  editor's existing `import { GOAL_COLORS } from '../store'` keeps working. */
+export { GOAL_COLORS } from '@shared/palette'
 
 interface PlannerState {
   // Persisted domain data
   goals: Goal[]
+  spheres: Sphere[]
   tasks: Task[]
   stale: StaleTask[]
   chats: ChatMap
@@ -106,6 +103,12 @@ interface PlannerState {
   reorderTask: (id: string, beforeId: string) => void
   setDragOverDay: (day: number | null) => void
 
+  // Spheres (life areas that group goals)
+  addSphere: (title: string, color?: string) => string
+  renameSphere: (id: string, title: string) => void
+  recolorSphere: (id: string, color: string) => void
+  deleteSphere: (id: string) => void
+
   // Stages (live goal milestones — edited directly on the goal page)
   addStage: (goalId: string) => void
   updateStage: (goalId: string, mId: string, patch: Partial<Milestone>) => void
@@ -128,9 +131,11 @@ interface PlannerState {
   closeEd: () => void
 
   // Goal editor (SMART)
-  openNewGoal: () => void
+  openNewGoal: (sphereId?: string) => void
   openEditGoal: (id: string) => void
   goalEdField: <K extends keyof GoalDraft>(k: K, v: GoalDraft[K]) => void
+  /** Pick the goal's sphere; keeps the goal colour matching the sphere unless it was customised. */
+  goalEdPickSphere: (id: string) => void
   goalEdAddMilestone: () => void
   goalEdUpdateMilestone: (mId: string, patch: Partial<Milestone>) => void
   goalEdRemoveMilestone: (mId: string) => void
@@ -155,7 +160,7 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 export const usePlanner = create<PlannerState>((set, get) => {
   const snapshot = (): PlannerData => {
     const s = get()
-    return { goals: s.goals, tasks: s.tasks, stale: s.stale, chats: s.chats, settings: s.settings, habits: s.habits }
+    return { goals: s.goals, spheres: s.spheres, tasks: s.tasks, stale: s.stale, chats: s.chats, settings: s.settings, habits: s.habits }
   }
 
   /** Debounced persist of the domain slice. */
@@ -186,7 +191,7 @@ export const usePlanner = create<PlannerState>((set, get) => {
   }
 
   return {
-    goals: [], tasks: [], stale: [], chats: {}, settings: {}, habits: [],
+    goals: [], spheres: [], tasks: [], stale: [], chats: {}, settings: {}, habits: [],
     view: 'today', activeGoalId: 'g1', dayIndex: todayDayIndex(), weekOffset: currentWeekIndex(),
     chatOpen: true, draft: '', ed: null, goalEd: null, dragOverDay: null,
     leisureSeed: 0, leisureLoading: false, added: {}, addedTaskIds: {},
@@ -198,8 +203,14 @@ export const usePlanner = create<PlannerState>((set, get) => {
         window.planner.loadData(),
         window.planner.hasKey().catch(() => false)
       ])
+      const spheres = data.spheres ?? []
+      // A goal's dot always shows its sphere's colour — snap any that drifted.
+      const goals = data.goals.map((g) => {
+        const sphere = spheres.find((sp) => sp.id === resolveSphereId(g, spheres))
+        return sphere && g.dotColor !== sphere.color ? { ...g, dotColor: sphere.color } : g
+      })
       set({
-        goals: data.goals, tasks: data.tasks, stale: data.stale,
+        goals, spheres, tasks: data.tasks, stale: data.stale,
         chats: data.chats, settings: data.settings, habits: data.habits ?? [],
         hasApiKey, ready: true
       })
@@ -289,6 +300,57 @@ export const usePlanner = create<PlannerState>((set, get) => {
       persist()
     },
     setDragOverDay: (day) => set({ dragOverDay: day }),
+
+    addSphere: (title, color) => {
+      const s = get()
+      const id = 'sphere' + Date.now()
+      const sphere: Sphere = {
+        id,
+        title: title.trim() || 'Новая сфера',
+        color: color ?? PALETTE[s.spheres.length % PALETTE.length]
+      }
+      set((st) => ({ spheres: [...st.spheres, sphere] }))
+      persist()
+      return id
+    },
+    renameSphere: (id, title) => {
+      const name = title.trim()
+      set((s) => ({
+        spheres: s.spheres.map((sp) => (sp.id === id ? { ...sp, title: name || sp.title } : sp)),
+        // Keep the denormalised category on this sphere's goals in sync (back-compat).
+        goals: name ? s.goals.map((g) => (g.sphereId === id ? { ...g, category: name } : g)) : s.goals
+      }))
+      persist()
+    },
+    recolorSphere: (id, color) => {
+      set((s) => ({
+        spheres: s.spheres.map((sp) => (sp.id === id ? { ...sp, color } : sp)),
+        // Goals share their sphere's colour — recolour the whole group with it.
+        goals: s.goals.map((g) => (g.sphereId === id ? { ...g, dotColor: color } : g))
+      }))
+      persist()
+    },
+    deleteSphere: (id) => {
+      // The uncategorised fallback sphere is permanent — it's where orphan goals live.
+      if (id === UNSORTED_SPHERE_ID) return
+      set((s) => {
+        // Ensure the fallback sphere exists, then move this sphere's goals into it.
+        const hasUnsorted = s.spheres.some((sp) => sp.id === UNSORTED_SPHERE_ID)
+        const base = hasUnsorted
+          ? s.spheres
+          : [{ id: UNSORTED_SPHERE_ID, title: UNSORTED_SPHERE_TITLE, color: UNSORTED_SPHERE_COLOR }, ...s.spheres]
+        return {
+          spheres: base.filter((sp) => sp.id !== id),
+          // Reparented goals adopt the "Разное" sphere's colour to stay matched.
+          goals: s.goals.map((g) =>
+            g.sphereId === id
+              ? { ...g, sphereId: UNSORTED_SPHERE_ID, category: UNSORTED_SPHERE_TITLE, dotColor: UNSORTED_SPHERE_COLOR }
+              : g
+          )
+        }
+      })
+      persist()
+    },
 
     // Update a goal's milestones in place and keep the closeness label in sync.
     addStage: (goalId) => {
@@ -426,20 +488,29 @@ export const usePlanner = create<PlannerState>((set, get) => {
     },
     closeEd: () => set({ ed: null }),
 
-    openNewGoal: () =>
+    openNewGoal: (sphereId) => {
+      const s = get()
+      const targetSphereId = sphereId ?? s.spheres[0]?.id ?? UNSORTED_SPHERE_ID
+      const sphere = s.spheres.find((sp) => sp.id === targetSphereId)
       set({
         goalEd: {
-          isNew: true, id: null, title: '', category: '', dotColor: GOAL_COLORS[0],
+          isNew: true, id: null, title: '',
+          sphereId: targetSphereId,
+          // Default the goal's colour to its sphere's, so the goal and sphere dots
+          // match by default (the user can still pick a different colour).
+          dotColor: sphere?.color ?? PALETTE[0],
           measurable: '', achievable: '', relevant: '', deadline: '',
           milestones: []
         }
-      }),
+      })
+    },
     openEditGoal: (id) => {
       const g = get().goals.find((x) => x.id === id)
       if (!g) return
       set({
         goalEd: {
-          isNew: false, id: g.id, title: g.title, category: g.category, dotColor: g.dotColor,
+          isNew: false, id: g.id, title: g.title,
+          sphereId: resolveSphereId(g, get().spheres), dotColor: g.dotColor,
           measurable: g.measurable || '', achievable: g.achievable || '',
           relevant: g.relevant || '', deadline: g.deadline || '',
           // Clone milestones so edits stay in the draft until saved.
@@ -448,6 +519,13 @@ export const usePlanner = create<PlannerState>((set, get) => {
       })
     },
     goalEdField: (k, v) => set((s) => (s.goalEd ? { goalEd: { ...s.goalEd, [k]: v } } : {})),
+    goalEdPickSphere: (id) =>
+      set((s) => {
+        if (!s.goalEd) return {}
+        const next = s.spheres.find((sp) => sp.id === id)
+        // The goal's dot always matches its sphere — adopt the picked sphere's colour.
+        return { goalEd: { ...s.goalEd, sphereId: id, dotColor: next?.color ?? s.goalEd.dotColor } }
+      }),
     goalEdAddMilestone: () =>
       set((s) =>
         s.goalEd
@@ -497,10 +575,14 @@ export const usePlanner = create<PlannerState>((set, get) => {
         const firstTodo = milestones.find((m) => m.status === 'todo')
         if (firstTodo) firstTodo.status = 'active'
       }
+      const sphere = get().spheres.find((s) => s.id === gd.sphereId)
       const common = {
         title,
-        category: gd.category.trim() || 'Цель',
-        dotColor: gd.dotColor,
+        sphereId: gd.sphereId,
+        // Denormalised label kept in sync with the sphere for back-compat readers.
+        category: sphere?.title ?? 'Цель',
+        // The goal's dot always matches its sphere's colour.
+        dotColor: sphere?.color ?? gd.dotColor,
         milestones,
         measurable: gd.measurable.trim() || undefined,
         achievable: gd.achievable.trim() || undefined,
@@ -517,7 +599,10 @@ export const usePlanner = create<PlannerState>((set, get) => {
             ? `Почему это важно: ${gd.relevant.trim()} Разбей цель на первые конкретные шаги — и начнём двигаться.`
             : 'Новая цель поставлена. Разбей её на первые конкретные шаги, чтобы начать двигаться.'
         }
-        set((s) => ({ goals: [...s.goals, goal], goalEd: null, view: 'goal', activeGoalId: id }))
+        // Stay on the current view after creating (don't jump into the goal).
+        // activeGoalId still points at the new goal so the empty "Создать цель"
+        // flow on the goal page shows it once one exists.
+        set((s) => ({ goals: [...s.goals, goal], goalEd: null, activeGoalId: id }))
       } else {
         set((s) => ({
           goals: s.goals.map((g) => (g.id === gd.id ? { ...g, ...common } : g)),
