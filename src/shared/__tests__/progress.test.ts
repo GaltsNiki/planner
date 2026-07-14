@@ -105,4 +105,26 @@ describe('weekAnalytics', () => {
     const row = a.goals.find((g) => g.goalId === 'g1')!
     expect(row).toMatchObject({ stageTitle: 'b', done: 1, total: 2, pct: 50 })
   })
+
+  it('compares the week rate against the immediately preceding week', () => {
+    const tasks = [
+      // Previous week (week 0): 1 of 2 done → 50%.
+      mk({ week: 0, done: true }),
+      mk({ week: 0, done: false }),
+      // Current week (week 1): 3 of 4 done → 75%.
+      mk({ week: 1, done: true }),
+      mk({ week: 1, done: true }),
+      mk({ week: 1, done: true }),
+      mk({ week: 1, done: false })
+    ]
+    const a = weekAnalytics(goals, tasks, 1)
+    expect(a.pct).toBe(75)
+    expect(a).toMatchObject({ prevDone: 1, prevTotal: 2, prevPct: 50, deltaPct: 25 })
+  })
+
+  it('reports a zero previous week when the prior week had no tasks', () => {
+    const a = weekAnalytics(goals, [mk({ week: 0, done: true })], 0)
+    // No tasks in week -1 → prev metrics are zero, delta equals this week's rate.
+    expect(a).toMatchObject({ prevDone: 0, prevTotal: 0, prevPct: 0, deltaPct: 100 })
+  })
 })

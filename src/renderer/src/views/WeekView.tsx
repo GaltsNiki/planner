@@ -117,22 +117,38 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
   const isWeekend = dayIndex >= 5
   const goalOf = (t: Task): Goal => goals.find((g) => g.id === t.goalId) || ROUTINE_GOAL
 
+  // Per-day completion, shown as a hairline meter under the header for at-a-glance scanning.
+  const doneCount = tasks.filter((t) => t.done).length
+  const dayPct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0
+
   return (
     <div
       ref={setNodeRef}
       style={{
         display: 'flex', flexDirection: 'column', gap: 8, borderRadius: 14, padding: '12px 10px', minHeight: 440, transition: 'background .12s,border-color .12s',
-        background: isOver ? COLORS.accent12 : isToday ? COLORS.accent06 : isWeekend ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
+        background: isOver ? COLORS.accent12 : isToday ? COLORS.accent06 : isWeekend ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.025)',
         border: isOver ? '1px dashed rgba(232,86,63,0.6)' : isToday ? `1px solid ${COLORS.accent18}` : `1px solid ${COLORS.border}`,
         boxShadow: isToday ? `0 6px 26px rgba(232,86,63,0.06)` : 'none'
       }}
     >
-      <div onClick={() => openDayInToday(dayIndex)} title="Открыть день" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, cursor: 'pointer' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: isToday ? COLORS.accent : isWeekend ? COLORS.textFaint : COLORS.textMuted }}>{DAY_SHORT[dayIndex]}</div>
-          {isToday && <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.4px', color: COLORS.accent, textTransform: 'uppercase' }}>сегодня</div>}
+      <div onClick={() => openDayInToday(dayIndex)} title="Открыть день" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4, cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.2px', color: isToday ? COLORS.accent : isWeekend ? COLORS.textFaint : COLORS.textMuted }}>{DAY_SHORT[dayIndex]}</div>
+            {isToday && <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.4px', color: COLORS.accent, textTransform: 'uppercase' }}>сегодня</div>}
+          </div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 24, padding: '0 6px', borderRadius: 7, fontSize: 13, fontWeight: 700, background: isToday ? COLORS.accent : 'transparent', color: isToday ? '#fff' : COLORS.textPrimary }}>{wm.days[dayIndex].num}</div>
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 24, padding: '0 6px', borderRadius: 7, fontSize: 13, fontWeight: 700, background: isToday ? COLORS.accent : 'transparent', color: isToday ? '#fff' : COLORS.textPrimary }}>{wm.days[dayIndex].num}</div>
+
+        {/* Hairline day meter + count — only when the day has tasks. */}
+        {tasks.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 2, width: dayPct + '%', background: dayPct === 100 ? COLORS.success : COLORS.accent, transition: 'width .3s' }} />
+            </div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{doneCount}/{tasks.length}</div>
+          </div>
+        )}
       </div>
 
       {/* Cap the list at ~8 rows; overflow scrolls within the column. */}
