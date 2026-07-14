@@ -83,8 +83,15 @@ export interface WeekAnalytics {
   total: number
   pct: number
   goals: WeekGoalStat[]
-  /** Mon–Fri completion. */
+  /** Mon–Sun completion, one entry per day. */
   bars: WeekDayStat[]
+  /** Completion rate of the immediately preceding week, for comparison. */
+  prevPct: number
+  /** Tasks done / total in the preceding week (null when that week had none). */
+  prevDone: number
+  prevTotal: number
+  /** This week's pct minus the previous week's, in whole percentage points. */
+  deltaPct: number
 }
 
 /**
@@ -126,11 +133,24 @@ export function weekAnalytics(
     return { day, pct: pctDone(ts), has: ts.length > 0, done: ts.filter((t) => t.done).length, total: ts.length }
   })
 
+  const pct = total ? Math.round((done / total) * 100) : 0
+
+  // Previous week, for the completion-rate comparison. Same scope (all tasks,
+  // leisure included) so the two rates are directly comparable.
+  const prev = tasks.filter((t) => (t.week || 0) === weekOffset - 1)
+  const prevDone = prev.filter((t) => t.done).length
+  const prevTotal = prev.length
+  const prevPct = prevTotal ? Math.round((prevDone / prevTotal) * 100) : 0
+
   return {
     done,
     total,
-    pct: total ? Math.round((done / total) * 100) : 0,
+    pct,
     goals: goalStatsList,
-    bars
+    bars,
+    prevDone,
+    prevTotal,
+    prevPct,
+    deltaPct: pct - prevPct
   }
 }
