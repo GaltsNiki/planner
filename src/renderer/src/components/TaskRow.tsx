@@ -32,9 +32,15 @@ export function TaskRow({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className="row-hover"
-      style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 13, padding: '13px 15px', background: COLORS.rowBg, border: `1px solid ${COLORS.border}`, borderRadius: 13, cursor: 'pointer' }}
+      // overflow:hidden clips the absolute accent bar to the row's rounded corners.
+      // alignItems:flex-start keeps the checkbox, time chip and bin aligned to the
+      // top of the row so they sit level with the title on multi-line tasks.
+      style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 13, padding: '14px 15px 14px 18px', background: COLORS.rowBg, border: `1px solid ${COLORS.border}`, borderRadius: 13, cursor: 'pointer', overflow: 'hidden' }}
     >
-      <div onClick={(e) => { stop(e); toggleTask(task.id) }} style={{ flex: 'none', display: 'flex' }}>
+      {/* Coloured left accent bar — the goal's colour (slate grey for routines). */}
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: goal.dotColor }} />
+
+      <div onClick={(e) => { stop(e); toggleTask(task.id) }} style={{ flex: 'none', display: 'flex', marginTop: 1 }}>
         {task.done ? (
           <div style={{ width: 22, height: 22, borderRadius: '50%', background: COLORS.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
@@ -45,64 +51,68 @@ export function TaskRow({
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Title first, bold — the primary line of each row. */}
+        {li.primary ? (
+          <a
+            href={li.primary.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={stop}
+            style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : goal.dotColor, textDecoration: task.done ? 'line-through' : 'none' }}
+          >
+            {task.title}
+          </a>
+        ) : (
+          <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : COLORS.taskTitle, textDecoration: task.done ? 'line-through' : 'none' }}>{task.title}</div>
+        )}
+
         {caption && (
           <div
             onClick={onCaption ? (e) => { stop(e); onCaption() } : undefined}
             title={onCaption ? 'Открыть цель' : undefined}
-            // Styled as an eyebrow label (uppercase, tracked, bold) and tinted with the
-            // goal's own accent colour so it reads as the task's goal/stage tag — not as
-            // another line of muted description text (which shares textMuted grey).
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, letterSpacing: '0.7px', textTransform: 'uppercase', color: goal.dotColor, marginBottom: 5, cursor: onCaption ? 'pointer' : 'default', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+            // Eyebrow label (uppercase, tracked, bold) tinted with the goal's accent
+            // colour and sitting under the title. The left accent bar already carries
+            // the colour cue, so no leading dot is needed here.
+            style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.7px', textTransform: 'uppercase', color: goal.dotColor, marginTop: 5, cursor: onCaption ? 'pointer' : 'default', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
           >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', flex: 'none', background: goal.dotColor }} />
             {caption}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          {time && (
-            <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 7, background: COLORS.accent14, color: COLORS.accentPartner, fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
-          )}
-          {li.primary ? (
-            <a
-              href={li.primary.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={stop}
-              style={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : goal.dotColor, textDecoration: task.done ? 'line-through' : 'none' }}
-            >
-              {task.title}
-            </a>
-          ) : (
-            <span style={{ fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : COLORS.taskTitle, textDecoration: task.done ? 'line-through' : 'none' }}>{task.title}</span>
-          )}
-        </div>
+
         {short && (
-          <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 4, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{short}</div>
+          <div style={{ fontSize: 13, color: COLORS.textMuted, marginTop: 5, lineHeight: 1.45, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{short}</div>
         )}
       </div>
 
-      {li.primary && (
-        <a
-          href={li.primary.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={stop}
-          style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#c9c9cd', fontSize: 12, textDecoration: 'none' }}
-        >
-          <span>{li.primary.label}</span>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>
-        </a>
-      )}
+      {/* Right cluster: time chip, optional link chip and the delete button, top-aligned. */}
+      <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+        {time && (
+          <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 7, background: COLORS.accent14, color: COLORS.accentPartner, fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
+        )}
 
-      <button
-        onClick={(e) => { stop(e); deleteTask(task.id) }}
-        onMouseEnter={() => setBinHover(true)}
-        onMouseLeave={() => setBinHover(false)}
-        title="Удалить задачу"
-        style={{ flex: 'none', width: 30, height: 30, borderRadius: 8, background: binHover ? 'rgba(240,113,92,0.12)' : 'transparent', border: 'none', color: binHover ? '#f0715c' : COLORS.textFaint, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0.3, transition: 'opacity .12s, color .12s, background .12s' }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-      </button>
+        {li.primary && (
+          <a
+            href={li.primary.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={stop}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: '#c9c9cd', fontSize: 12, textDecoration: 'none' }}
+          >
+            <span>{li.primary.label}</span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7" /><path d="M8 7h9v9" /></svg>
+          </a>
+        )}
+
+        <button
+          onClick={(e) => { stop(e); deleteTask(task.id) }}
+          onMouseEnter={() => setBinHover(true)}
+          onMouseLeave={() => setBinHover(false)}
+          title="Удалить задачу"
+          style={{ flex: 'none', width: 30, height: 30, borderRadius: 8, background: binHover ? 'rgba(240,113,92,0.12)' : 'transparent', border: 'none', color: binHover ? '#f0715c' : COLORS.textFaint, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: hover ? 1 : 0.3, transition: 'opacity .12s, color .12s, background .12s' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
+        </button>
+      </div>
 
       {menu.element}
     </div>
