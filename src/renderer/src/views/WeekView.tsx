@@ -11,6 +11,7 @@ import { Calendar } from '../components/Calendar'
 import { useContextMenu, type MenuItem } from '../components/ContextMenu'
 import { weekModel, weekBadge, DAY_SHORT, offsetToDate, dateToOffset, currentWeekIndex } from '@shared/dates'
 import { ROUTINE_GOAL } from '@shared/routine'
+import { WEEKEND_IDEAS_ENABLED } from '../features'
 import { COLORS } from '../tokens'
 import type { Task, Goal } from '@shared/types'
 
@@ -238,8 +239,20 @@ export function WeekView(): React.JSX.Element {
         </DragOverlay>
       </DndContext>
 
-      <WeekAnalytics />
-      <WeekendIdeas />
+      {/* Weekly analytics (compact, left) beside the weekend leisure ideas (right).
+          minmax(0,…) lets both columns shrink so their inner content wraps/ellipsizes.
+          With the weekend ideas off, they are hidden and analytics span the full
+          width. */}
+      {WEEKEND_IDEAS_ENABLED ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.4fr)', gap: 16, marginTop: 20, alignItems: 'start' }}>
+          <WeekAnalytics />
+          <WeekendIdeas />
+        </div>
+      ) : (
+        <div style={{ marginTop: 20 }}>
+          <WeekAnalytics />
+        </div>
+      )}
 
       {cal && (
         <Calendar selected={rangeDate} today={today} weekMode anchor={cal} onPick={pickWeek} onClose={() => setCal(null)} />

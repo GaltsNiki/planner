@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractTime, extractLink, linkify, byTime, stripTime, escapeHtml } from '../taskMeta'
+import { extractTime, extractLink, linkify, byTime, byDate, stripTime, escapeHtml } from '../taskMeta'
 
 describe('escapeHtml', () => {
   it('neutralises markup so web-sourced text cannot execute', () => {
@@ -81,5 +81,26 @@ describe('byTime', () => {
     expect(sorted[0].desc).toBe('в 07:00')
     expect(sorted[1].desc).toBe('в 19:00')
     expect(sorted[2].desc).toBe('без времени')
+  })
+})
+
+describe('byDate', () => {
+  it('orders by absolute date (week, then weekday) earliest-first', () => {
+    const arr = [
+      { week: 2, day: 0, desc: 'позже' }, // later week wins over earlier weekday
+      { week: 1, day: 6, desc: 'раньше' },
+      { week: 1, day: 0, desc: 'самая ранняя' }
+    ]
+    const sorted = [...arr].sort(byDate)
+    expect(sorted.map((t) => t.desc)).toEqual(['самая ранняя', 'раньше', 'позже'])
+  })
+  it('breaks ties within the same day by derived time', () => {
+    const arr = [
+      { week: 3, day: 2, desc: 'встреча в 18:00' },
+      { week: 3, day: 2, desc: 'зарядка в 07:30' }
+    ]
+    const sorted = [...arr].sort(byDate)
+    expect(sorted[0].desc).toBe('зарядка в 07:30')
+    expect(sorted[1].desc).toBe('встреча в 18:00')
   })
 })

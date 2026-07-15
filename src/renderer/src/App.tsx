@@ -13,6 +13,7 @@ import { GoalEditor } from './components/GoalEditor'
 import { Settings } from './components/Settings'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { TextContextMenu } from './components/TextContextMenu'
+import { AI_FEATURES_ENABLED } from './features'
 import { COLORS } from './tokens'
 import { weekModel, offsetToDate, DAY_FULL, currentWeekIndex } from '@shared/dates'
 import { fmtDay } from './components/Calendar'
@@ -28,7 +29,7 @@ function useHeader(): { title: string; sub: string } {
   }
   if (view === 'week') return { title: 'Неделя', sub: weekModel(weekOffset).range }
   if (view === 'habits') return { title: 'Привычки', sub: 'Ежедневные привычки по дням недели' }
-  if (view === 'review') return { title: 'Обзор', sub: 'Итоги недели' }
+  if (view === 'review') return { title: 'Сферы жизни', sub: 'Ваши цели по сферам жизни' }
   return { title: ag?.title ?? '', sub: ag?.category ?? '' }
 }
 
@@ -71,13 +72,15 @@ export function App(): React.JSX.Element {
               <div style={{ fontSize: 12.5, color: COLORS.textFaint, marginTop: 1 }}>{header.sub}</div>
             </div>
           </div>
-          <button
-            onClick={toggleChat}
-            style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 15px', borderRadius: 11, background: COLORS.accent13, border: `1px solid ${COLORS.accent30}`, color: COLORS.accent, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}
-          >
-            <ClaudeMark size={16} radius={5} />
-            Спросить Claude
-          </button>
+          {AI_FEATURES_ENABLED && (
+            <button
+              onClick={toggleChat}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 15px', borderRadius: 11, background: COLORS.accent13, border: `1px solid ${COLORS.accent30}`, color: COLORS.accent, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <ClaudeMark size={16} radius={5} />
+              Спросить Claude
+            </button>
+          )}
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
@@ -91,7 +94,7 @@ export function App(): React.JSX.Element {
         </div>
       </div>
 
-      {chatOpen && <ChatPanel />}
+      {AI_FEATURES_ENABLED && chatOpen && <ChatPanel />}
       {ed && <TaskEditor />}
       <GoalEditor />
       <Settings />

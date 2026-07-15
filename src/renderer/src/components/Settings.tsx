@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { usePlanner } from '../store'
+import { AI_FEATURES_ENABLED } from '../features'
 import { COLORS } from '../tokens'
 
 const labelStyle: React.CSSProperties = { fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', color: COLORS.textMuted, margin: '18px 0 8px' }
@@ -35,7 +36,9 @@ export function Settings(): React.JSX.Element | null {
     return () => window.removeEventListener('keydown', onKey)
   }, [settingsOpen, closeSettings])
 
-  if (!settingsOpen) return null
+  // The whole Settings modal only configures the AI features (API key + weekend
+  // ideas), so it stays closed while those features are hidden.
+  if (!settingsOpen || !AI_FEATURES_ENABLED) return null
 
   const saveKey = async (): Promise<void> => {
     if (!keyDraft.trim()) return

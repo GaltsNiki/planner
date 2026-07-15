@@ -108,6 +108,8 @@ interface PlannerState {
   renameSphere: (id: string, title: string) => void
   recolorSphere: (id: string, color: string) => void
   deleteSphere: (id: string) => void
+  /** Reorder spheres on the dashboard: move `id` to sit where `beforeId` currently is. */
+  reorderSphere: (id: string, beforeId: string) => void
 
   // Stages (live goal milestones — edited directly on the goal page)
   addStage: (goalId: string) => void
@@ -348,6 +350,21 @@ export const usePlanner = create<PlannerState>((set, get) => {
               : g
           )
         }
+      })
+      persist()
+    },
+    reorderSphere: (id, beforeId) => {
+      if (id === beforeId) return
+      set((s) => {
+        const arr = s.spheres.slice()
+        const from = arr.findIndex((sp) => sp.id === id)
+        const hasTarget = arr.some((sp) => sp.id === beforeId)
+        if (from < 0 || !hasTarget) return {}
+        const [moved] = arr.splice(from, 1)
+        // Recompute the target index after removal, then insert just before it.
+        const to = arr.findIndex((sp) => sp.id === beforeId)
+        arr.splice(to, 0, moved)
+        return { spheres: arr }
       })
       persist()
     },

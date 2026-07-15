@@ -4,6 +4,8 @@ import { ClaudeMark } from '../components/primitives'
 import { useContextMenu } from '../components/ContextMenu'
 import { goalStats } from '@shared/progress'
 import { stepSegments } from '@shared/closeness'
+import { byDate } from '@shared/taskMeta'
+import { AI_FEATURES_ENABLED } from '../features'
 import { COLORS } from '../tokens'
 import type { Goal, Milestone, MilestoneStatus, Task } from '@shared/types'
 
@@ -68,10 +70,12 @@ export function GoalDetail(): React.JSX.Element {
           {segments.map((s, i) => <div key={i} style={{ flex: 1, fontSize: 11, lineHeight: 1.3, color: s.muted ? COLORS.textDisabled : COLORS.textSecondary }}>{s.title}</div>)}
         </div>
 
-        <div style={{ display: 'flex', gap: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${COLORS.border06}`, borderRadius: 12, padding: '14px 15px' }}>
-          <ClaudeMark size={26} radius={8} />
-          <div style={{ fontSize: 13.5, lineHeight: 1.55, color: '#c9c9cd' }}>{ag.claudeTake}</div>
-        </div>
+        {AI_FEATURES_ENABLED && (
+          <div style={{ display: 'flex', gap: 11, background: 'rgba(255,255,255,0.03)', border: `1px solid ${COLORS.border06}`, borderRadius: 12, padding: '14px 15px' }}>
+            <ClaudeMark size={26} radius={8} />
+            <div style={{ fontSize: 13.5, lineHeight: 1.55, color: '#c9c9cd' }}>{ag.claudeTake}</div>
+          </div>
+        )}
 
         {(ag.measurable || ag.achievable || ag.relevant || ag.deadline) && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
@@ -112,7 +116,7 @@ export function GoalDetail(): React.JSX.Element {
       {/* Tasks whose milestone doesn't exist (e.g. goals with no milestones). */}
       {(() => {
         const mIds = new Set(ag.milestones.map((m) => m.id))
-        const loose = tasks.filter((t) => t.goalId === ag.id && !mIds.has(t.mId))
+        const loose = tasks.filter((t) => t.goalId === ag.id && !mIds.has(t.mId)).sort(byDate)
         const done = loose.filter((t) => t.done).length
         // Only worth showing when there are loose tasks, or when the goal has no stages at all.
         if (!loose.length && ag.milestones.length) return null
@@ -145,7 +149,7 @@ interface StageSectionProps {
 function StageSection({ goal, milestone: m, index, total, tasks }: StageSectionProps): React.JSX.Element {
   const { toggleTask, updateStage, removeStage, moveStage, openNew } = usePlanner()
   const [hover, setHover] = useState(false)
-  const mts = tasks.filter((t) => t.goalId === goal.id && t.mId === m.id)
+  const mts = tasks.filter((t) => t.goalId === goal.id && t.mId === m.id).sort(byDate)
   const md = mts.filter((t) => t.done).length
   const chip = chipFor(m.status)
   const first = index === 0

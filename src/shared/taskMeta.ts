@@ -113,3 +113,20 @@ export function byTime(a: { desc: string }, b: { desc: string }): number {
   if (bt) return 1
   return 0
 }
+
+/** The absolute day position of a task, so (week, day) sorts as one chronological number. */
+function dayPosition(t: { week: number; day: number }): number {
+  return t.week * 7 + t.day
+}
+
+/**
+ * Comparator ordering tasks by the date they're assigned to (earliest first):
+ * by absolute week, then weekday, with the derived time as the within-day tiebreaker.
+ */
+export function byDate(
+  a: { week: number; day: number; desc: string },
+  b: { week: number; day: number; desc: string }
+): number {
+  const diff = dayPosition(a) - dayPosition(b)
+  return diff !== 0 ? diff : byTime(a, b)
+}

@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from 'react'
+import {
+  DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  closestCenter, type DragEndEvent
+} from '@dnd-kit/core'
+import {
+  SortableContext, useSortable, rectSortingStrategy, sortableKeyboardCoordinates
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { usePlanner, GOAL_COLORS } from '../store'
 import { ClaudeMark, GoalDot } from '../components/primitives'
 import { goalStats, sphereStatsOf } from '@shared/progress'
 import { stepSegments } from '@shared/closeness'
-import { staleRows, computeStale } from '@shared/staleness'
 import { resolveSphereId, UNSORTED_SPHERE_ID } from '@shared/spheres'
 import type { Goal, Task } from '@shared/types'
+import { AI_FEATURES_ENABLED } from '../features'
 import { COLORS } from '../tokens'
 
 /**
@@ -36,8 +44,8 @@ const GOALS_SCROLL_MAX = 300
 
 export function ReviewView(): React.JSX.Element {
   const {
-    goals, spheres, tasks, selectGoal, openChat, breakDown, openNewGoal, deleteGoal,
-    addSphere, renameSphere, recolorSphere, deleteSphere
+    goals, spheres, tasks, selectGoal, openChat, openNewGoal, deleteGoal,
+    addSphere, renameSphere, recolorSphere, deleteSphere, reorderSphere
   } = usePlanner()
   const [summary, setSummary] = useState('')
 
@@ -46,6 +54,13 @@ export function ReviewView(): React.JSX.Element {
   const [sphereTitle, setSphereTitle] = useState('')
   // Which sphere's colour palette is currently open (only one at a time).
   const [recoloringSphere, setRecoloringSphere] = useState<string | null>(null)
+
+  // Drag-to-reorder: a small pointer travel is required before a drag begins, so
+  // clicks on the header buttons still register. Keyboard reordering is supported too.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   const startEditSphere = (id: string, title: string): void => {
     setEditingSphere(id)
@@ -67,15 +82,15 @@ export function ReviewView(): React.JSX.Element {
 
   // The weekly summary comes from the Claude "review" call. Debounced so that
   // toggling tasks on this screen doesn't fire a fresh (paid) request per click.
+  // Skipped entirely while the AI features are hidden so no request is made.
   useEffect(() => {
+    if (!AI_FEATURES_ENABLED) return
     let active = true
     const id = setTimeout(() => {
       void window.planner.review(goals, tasks).then((r) => { if (active) setSummary(r) })
     }, 800)
     return () => { active = false; clearTimeout(id) }
   }, [goals, tasks])
-
-  const staleList = staleRows(computeStale(tasks), goals)
 
   // Group every goal under its sphere. The "Разное" fallback sphere only appears
   // when it actually holds orphan goals; every user-made sphere always shows so it
@@ -84,82 +99,99 @@ export function ReviewView(): React.JSX.Element {
     .map((sphere) => ({ sphere, own: goals.filter((g) => resolveSphereId(g, spheres) === sphere.id) }))
     .filter((grp) => grp.sphere.id !== UNSORTED_SPHERE_ID || grp.own.length > 0)
 
+  // A drop finishes a reorder: move the dragged sphere into the target's slot.
+  const onDragEnd = (e: DragEndEvent): void => {
+    const { active, over } = e
+    if (over && active.id !== over.id) reorderSphere(String(active.id), String(over.id))
+  }
+
   return (
-    <div style={{ maxWidth: 940, margin: '0 auto' }}>
-      <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border06}`, borderRadius: 18, padding: '22px 24px', marginBottom: 24, display: 'flex', gap: 16 }}>
-        <ClaudeMark size={30} radius={9} />
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Итоги недели от Claude</div>
-          <div style={{ fontSize: 14, lineHeight: 1.6, color: '#c9c9cd', maxWidth: 640, minHeight: 44 }}>{summary || 'Собираю итоги недели…'}</div>
-          <button onClick={openChat} style={{ marginTop: 14, padding: '9px 16px', borderRadius: 10, background: COLORS.accent, border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Скорректировать план</button>
+    // Full-bleed layout — the dashboard spans the whole content area so the
+    // desktop window's width is used instead of a narrow centred column.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Weekly summary — a full-width banner. The "correct the plan" button sits
+          on the right on wide screens (wraps below on narrow ones). Hidden while
+          the AI features are off. */}
+      {AI_FEATURES_ENABLED && (
+        <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border06}`, borderRadius: 18, padding: '22px 24px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+          <ClaudeMark size={30} radius={9} />
+          <div style={{ flex: 1, minWidth: 300 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Итоги недели от Claude</div>
+            <div style={{ fontSize: 14, lineHeight: 1.6, color: '#c9c9cd', maxWidth: 900, minHeight: 44 }}>{summary || 'Собираю итоги недели…'}</div>
+          </div>
+          <button onClick={openChat} style={{ flex: 'none', padding: '11px 18px', borderRadius: 10, background: COLORS.accent, border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Скорректировать план</button>
         </div>
-      </div>
+      )}
 
-      {/* Spheres of life — a grid of sphere cards so the areas of life read as a
-          group at a glance. Each card is painted in its sphere's colour (fill,
-          border, header band, progress) and holds its own goals. Spheres are
-          created, renamed, recoloured and deleted right here; goals are added
-          straight into a sphere. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 2px 14px' }}>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>Сферы жизни</div>
-        <button
-          onClick={addAndEditSphere}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 9, background: 'transparent', border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
-          Добавить сферу
-        </button>
-      </div>
-
-      {/* Masonry layout (CSS multi-column) rather than a grid: cards pack
-          directly under one another within each column, so a short card never
-          leaves an empty gap below it while a taller neighbour sets the row
-          height. Column width matches the old grid track; break-inside on each
-          card keeps a sphere from splitting across two columns. */}
-      <div style={{ columnWidth: 340, columnGap: 16, marginBottom: 24 }}>
-        {sphereGroups.map(({ sphere: sp, own }) => (
-          <SphereCard
-            key={sp.id}
-            sphere={sp}
-            goals={own}
-            tasks={tasks}
-            editing={editingSphere === sp.id}
-            editingTitle={sphereTitle}
-            recoloring={recoloringSphere === sp.id}
-            permanent={sp.id === UNSORTED_SPHERE_ID}
-            onEditTitle={setSphereTitle}
-            onStartEdit={() => startEditSphere(sp.id, sp.title)}
-            onCommitEdit={commitEditSphere}
-            onCancelEdit={cancelEditSphere}
-            onToggleRecolor={() => setRecoloringSphere(recoloringSphere === sp.id ? null : sp.id)}
-            onPickColor={(c) => { recolorSphere(sp.id, c); setRecoloringSphere(null) }}
-            onDeleteSphere={() => deleteSphere(sp.id)}
-            onAddGoal={() => openNewGoal(sp.id)}
-            onOpenGoal={selectGoal}
-            onDeleteGoal={deleteGoal}
-          />
-        ))}
-      </div>
-
-      <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border06}`, borderRadius: 16, padding: '20px 22px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 14 }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Застрявшие задачи</div>
-          <div style={{ fontSize: 12, color: '#fff', background: 'rgba(232,86,63,0.9)', borderRadius: 20, padding: '1px 8px', fontWeight: 600 }}>{staleList.length}</div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {staleList.map((s) => (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: COLORS.rowBg, border: `1px solid ${COLORS.border}`, borderRadius: 12 }}>
-              <GoalDot color={s.dotColor} size={8} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14 }}>{s.title}</div>
-                <div style={{ fontSize: 11.5, color: COLORS.textFaint2, marginTop: 2 }}>{s.goalTitle} · {s.daysLabel}</div>
-              </div>
-              <button onClick={() => void breakDown(s.title, s.goalId)} style={{ flex: 'none', padding: '7px 13px', borderRadius: 9, background: COLORS.accent14, border: `1px solid ${COLORS.accent28}`, color: COLORS.accent, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Разбить на шаги</button>
+      {/* Spheres of life — a responsive grid of sphere cards so the areas of life
+          read as a group at a glance and fill the full width of the window. Each
+          card is painted in its sphere's colour (fill, border, header band,
+          progress) and holds its own goals. Cards can be dragged by the grip in
+          their header to reorder the dashboard. Spheres are created, renamed,
+          recoloured and deleted right here; goals are added straight into a sphere. */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 2px 14px', flexWrap: 'wrap' }}>
+          {sphereGroups.length > 1 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: COLORS.textFaint2, fontSize: 12.5 }}>
+              <GripIcon />
+              Перетащите карточку за уголок, чтобы изменить порядок сфер
             </div>
-          ))}
+          ) : (
+            <div />
+          )}
+          <button
+            onClick={addAndEditSphere}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 9, background: 'transparent', border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
+            Добавить сферу
+          </button>
         </div>
+
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={sphereGroups.map((g) => g.sphere.id)} strategy={rectSortingStrategy}>
+            {/* auto-fill tracks pack as many ~320px columns as the width allows, so
+                the grid grows with the window; short cards keep their natural
+                height (align to the top) rather than stretching. */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16, alignItems: 'start' }}>
+              {sphereGroups.map(({ sphere: sp, own }) => (
+                <SphereCard
+                  key={sp.id}
+                  sphere={sp}
+                  goals={own}
+                  tasks={tasks}
+                  editing={editingSphere === sp.id}
+                  editingTitle={sphereTitle}
+                  recoloring={recoloringSphere === sp.id}
+                  permanent={sp.id === UNSORTED_SPHERE_ID}
+                  onEditTitle={setSphereTitle}
+                  onStartEdit={() => startEditSphere(sp.id, sp.title)}
+                  onCommitEdit={commitEditSphere}
+                  onCancelEdit={cancelEditSphere}
+                  onToggleRecolor={() => setRecoloringSphere(recoloringSphere === sp.id ? null : sp.id)}
+                  onPickColor={(c) => { recolorSphere(sp.id, c); setRecoloringSphere(null) }}
+                  onDeleteSphere={() => deleteSphere(sp.id)}
+                  onAddGoal={() => openNewGoal(sp.id)}
+                  onOpenGoal={selectGoal}
+                  onDeleteGoal={deleteGoal}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
+  )
+}
+
+/** The six-dot grip that marks a drag handle. */
+function GripIcon(): React.JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" />
+      <circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" />
+      <circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" />
+    </svg>
   )
 }
 
@@ -185,9 +217,10 @@ interface SphereCardProps {
 
 /**
  * One sphere of life as a self-contained card: a colour-tinted header carrying
- * the sphere name and its rolled-up progress, then the sphere's goals, then a
- * slim "add goal" row. Everything colour-coded in the sphere's own accent so the
- * card visibly reads as one group.
+ * a drag grip, the sphere name and its rolled-up progress, then the sphere's
+ * goals, then a slim "add goal" row. Everything colour-coded in the sphere's own
+ * accent so the card visibly reads as one group. The whole card is a sortable
+ * item; only the grip starts a drag, so the header's other controls keep working.
  */
 function SphereCard(props: SphereCardProps): React.JSX.Element {
   const {
@@ -198,13 +231,36 @@ function SphereCard(props: SphereCardProps): React.JSX.Element {
   const tint = sphereTint(sp.color)
   const roll = sphereStatsOf(goals, tasks)
 
+  const {
+    attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging
+  } = useSortable({ id: sp.id })
+  const sortableStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // Lift the card while it's being dragged so it reads as "picked up".
+    opacity: isDragging ? 0.55 : 1,
+    zIndex: isDragging ? 5 : 'auto',
+    boxShadow: isDragging ? '0 12px 30px rgba(0,0,0,0.45)' : 'none'
+  }
+
   return (
-    <section style={{ background: tint.fill, border: `1px solid ${tint.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', breakInside: 'avoid', marginBottom: 16 }}>
+    <section ref={setNodeRef} style={{ ...sortableStyle, background: tint.fill, border: `1px solid ${tint.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
       {/* Header band — tinted in the sphere colour, with a solid colour spine on
           the left edge as an unmistakable "this is the sphere colour" marker. */}
       <div style={{ position: 'relative', background: tint.band, padding: '14px 16px 14px 18px', borderBottom: `1px solid ${tint.border}` }}>
         <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, background: sp.color }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Drag grip — the only place a drag starts, so clicks on the buttons
+              below never get swallowed by the sortable. */}
+          <button
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            title="Перетащите, чтобы изменить порядок"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, borderRadius: 6, background: 'transparent', border: 'none', color: tint.softText, cursor: isDragging ? 'grabbing' : 'grab', flex: 'none', padding: 0, touchAction: 'none' }}
+          >
+            <GripIcon />
+          </button>
           <button
             onClick={onToggleRecolor}
             title="Изменить цвет"

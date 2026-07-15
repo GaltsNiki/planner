@@ -6,6 +6,7 @@ import { Calendar, fmtDay } from '../components/Calendar'
 import { dailyItems } from '@shared/dailyOrder'
 import { staleRows, computeStale } from '@shared/staleness'
 import { DAY_FULL, offsetToDate, dateToOffset, currentWeekIndex } from '@shared/dates'
+import { AI_FEATURES_ENABLED } from '../features'
 import { COLORS } from '../tokens'
 
 function DateNavigator(): React.JSX.Element {
@@ -109,7 +110,9 @@ export function TodayView(): React.JSX.Element {
         <span>{dayItems.length ? 'Добавить задачу' : 'На этот день пока нет задач — добавить'}</span>
       </div>
 
-      {staleList.length > 0 && (
+      {/* "Stuck?" — offers to break stale tasks into steps via Claude, so it is
+          hidden while the AI features are off. */}
+      {AI_FEATURES_ENABLED && staleList.length > 0 && (
       <div style={{ background: COLORS.accent06, border: `1px solid ${COLORS.accent18}`, borderRadius: 16, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
           <div style={{ fontSize: 14.5, fontWeight: 600 }}>Застряли?</div>

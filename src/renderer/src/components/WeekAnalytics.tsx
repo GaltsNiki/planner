@@ -1,29 +1,13 @@
 import React, { useState } from 'react'
 import { usePlanner } from '../store'
-import { GoalDot } from './primitives'
-import { goalStats, weekAnalytics } from '@shared/progress'
+import { weekAnalytics } from '@shared/progress'
 import { DAY_SHORT } from '@shared/dates'
-import { LEISURE_GOAL_ID } from '@shared/leisure'
 import { COLORS } from '../tokens'
-import type { Goal, Task } from '@shared/types'
 import type { WeekDayStat } from '@shared/progress'
-
-/** Russian plural: forms = [one, few, many], e.g. ['задача','задачи','задач']. */
-function plural(n: number, forms: [string, string, string]): string {
-  const abs = Math.abs(n) % 100
-  const last = abs % 10
-  if (abs >= 11 && abs <= 14) return forms[2]
-  if (last === 1) return forms[0]
-  if (last >= 2 && last <= 4) return forms[1]
-  return forms[2]
-}
-
-const TASKS: [string, string, string] = ['задача', 'задачи', 'задач']
 
 export function WeekAnalytics(): React.JSX.Element {
   const { goals, tasks, weekOffset } = usePlanner()
   const a = weekAnalytics(goals, tasks, weekOffset)
-  const shown = goals.filter((g) => g.id !== LEISURE_GOAL_ID && g.milestones.length > 0)
 
   return (
     <section
@@ -31,8 +15,7 @@ export function WeekAnalytics(): React.JSX.Element {
         background: COLORS.cardBg,
         border: `1px solid ${COLORS.border06}`,
         borderRadius: 16,
-        padding: '20px 22px',
-        marginTop: 20
+        padding: '20px 22px'
       }}
     >
       {/* ── Header ─────────────────────────────────────────────── */}
@@ -41,29 +24,20 @@ export function WeekAnalytics(): React.JSX.Element {
         <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>Пн–Вс</div>
       </header>
 
-      {/* ── Body: completion + progress on the left (half width) · a taller
-             day-activity panel fills the right column top-to-bottom ───────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 28, alignItems: 'stretch' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <CompletionTile done={a.done} total={a.total} pct={a.pct} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <SectionLabel>Прогресс</SectionLabel>
-            {shown.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: COLORS.textFaint2 }}>Добавьте этапы к целям, чтобы видеть прогресс.</div>
-            ) : (
-              shown.map((g) => <GoalStepper key={g.id} goal={g} tasks={tasks} />)
-            )}
-          </div>
-        </div>
+      {/* ── Body: the weekly completion count, then a full-width day-activity
+             panel with the week highlights beneath it. ─────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <CompletionTile done={a.done} total={a.total} pct={a.pct} />
 
-        {/* Right column stretches to the left column's height, so the chart —
-            which flexes to fill — is now much taller. Highlights sit at the bottom. */}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <SectionLabel>Активность по дням</SectionLabel>
-          <div style={{ flex: 1, minHeight: 200, display: 'flex' }}>
+          {/* A definite height is required here: the columns inside DayDistribution
+              grow via percentage/flex heights, which only resolve against a fixed
+              ancestor height (not min-height). */}
+          <div style={{ height: 220, display: 'flex' }}>
             <DayDistribution bars={a.bars} />
           </div>
-          <WeekHighlights bars={a.bars} done={a.done} />
+          <WeekHighlights bars={a.bars} />
         </div>
       </div>
     </section>
@@ -250,11 +224,10 @@ function DayDistribution({ bars }: { bars: WeekDayStat[] }): React.JSX.Element {
 }
 
 /**
- * Two at-a-glance facts under the day chart — they use the otherwise empty lower
- * half of the right column and add insight the raw counts don't: which day went
- * best, and the average tasks finished per active day.
+ * An at-a-glance fact under the day chart — it uses the otherwise empty lower half
+ * of the panel and adds insight the raw counts don't: which day went best.
  */
-function WeekHighlights({ bars, done }: { bars: WeekDayStat[]; done: number }): React.JSX.Element {
+function WeekHighlights({ bars }: { bars: WeekDayStat[] }): React.JSX.Element {
   const activeDays = bars.filter((b) => b.has)
   // "Best day" = most tasks finished, tie-broken by the higher completion rate.
   const best = activeDays.reduce<WeekDayStat | null>((top, b) => {
@@ -263,12 +236,10 @@ function WeekHighlights({ bars, done }: { bars: WeekDayStat[]; done: number }): 
     if (b.done === top.done && b.pct > top.pct) return b
     return top
   }, null)
-  const pace = activeDays.length ? Math.round(done / activeDays.length) : 0
 
   return (
     <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${COLORS.border06}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <HighlightRow label="Лучший день" value={best && best.done > 0 ? `${DAY_SHORT[best.day]} · ${best.done}/${best.total}` : '—'} />
-      <HighlightRow label="Средний темп" value={activeDays.length ? `${pace} ${plural(pace, TASKS)} в день` : '—'} />
     </div>
   )
 }
@@ -278,52 +249,6 @@ function HighlightRow({ label, value }: { label: string; value: string }): React
     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
       <span style={{ fontSize: 12, color: COLORS.textMuted }}>{label}</span>
       <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.textSecondary, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{value}</span>
-    </div>
-  )
-}
-
-/* ───────────────────────── Goal steppers ─────────────────────── */
-
-/** One goal: title + a compact horizontal stage bar (fill = completion) with labels under it. */
-function GoalStepper({ goal, tasks }: { goal: Goal; tasks: Task[] }): React.JSX.Element {
-  const st = goalStats(goal, tasks)
-  const segs = goal.milestones.map((m) => {
-    const ts = tasks.filter((t) => t.goalId === goal.id && t.mId === m.id)
-    const total = ts.length
-    const done = ts.filter((t) => t.done).length
-    const pct = total ? Math.round((done / total) * 100) : m.status === 'done' ? 100 : 0
-    return { m, pct }
-  })
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
-        <GoalDot color={goal.dotColor} size={8} />
-        <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{goal.title}</div>
-        <div style={{ fontSize: 11.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{st.mDone}/{st.mTotal} этапов</div>
-      </div>
-
-      {/* Stage bars — filled in the goal's own colour, so each goal reads at a glance. */}
-      <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
-        {segs.map(({ m, pct }) => (
-          <div key={m.id} style={{ flex: 1, height: 6, borderRadius: 3, background: COLORS.border06, overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: 3, width: pct + '%', background: goal.dotColor, transition: 'width .3s' }} />
-          </div>
-        ))}
-      </div>
-
-      {/* Stage labels — coloured like the goal view (no red text); the active bar
-          above carries the emphasis. */}
-      <div style={{ display: 'flex', gap: 5 }}>
-        {segs.map(({ m }) => {
-          const active = m.status === 'active'
-          return (
-            <div key={m.id} style={{ flex: 1, fontSize: 11, lineHeight: 1.3, color: m.status === 'todo' ? COLORS.textDisabled : COLORS.textSecondary, fontWeight: active ? 600 : 500, overflow: 'hidden' }}>
-              {m.title}
-            </div>
-          )
-        })}
-      </div>
     </div>
   )
 }

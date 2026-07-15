@@ -71,7 +71,7 @@ export function WeekendIdeas(): React.JSX.Element {
   const sun = items.filter((s) => s.day === 6)
 
   return (
-    <div style={{ background: 'linear-gradient(180deg,rgba(232,86,63,0.05),rgba(255,255,255,0.02))', border: `1px solid ${COLORS.border06}`, borderRadius: 16, padding: '20px 22px', marginTop: 16 }}>
+    <div style={{ background: 'linear-gradient(180deg,rgba(232,86,63,0.05),rgba(255,255,255,0.02))', border: `1px solid ${COLORS.border06}`, borderRadius: 16, padding: '20px 22px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
         <ClaudeMark size={30} radius={9} />
         <div style={{ flex: 1, minWidth: 0 }}>

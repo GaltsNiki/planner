@@ -3,6 +3,7 @@ import { usePlanner } from '../store'
 import { goalStats } from '@shared/progress'
 import { resolveSphereId, UNSORTED_SPHERE_ID } from '@shared/spheres'
 import { useContextMenu } from './ContextMenu'
+import { AI_FEATURES_ENABLED } from '../features'
 import { COLORS } from '../tokens'
 import type { View } from '@shared/types'
 
@@ -78,7 +79,7 @@ export function Sidebar(): React.JSX.Element {
         <NavItem active={view === 'today'} label="Сегодня" onClick={() => setView('today')} icon={icons.today} />
         <NavItem active={view === 'week'} label="Неделя" onClick={() => setView('week')} icon={icons.week} />
         <NavItem active={view === 'habits'} label="Привычки" onClick={() => setView('habits')} icon={icons.habits} />
-        <NavItem active={view === 'review'} label="Обзор" onClick={() => setView('review')} icon={icons.review} />
+        <NavItem active={view === 'review'} label="Сферы жизни" onClick={() => setView('review')} icon={icons.review} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', margin: '22px 8px 8px' }}>
@@ -93,7 +94,7 @@ export function Sidebar(): React.JSX.Element {
             return (
               <div key={sp.id} style={{ marginBottom: 6 }}>
                 {/* Sphere header — read-only here; spheres and their goals are
-                    created in the Обзор view, not from the sidebar. */}
+                    created in the «Сферы жизни» view, not from the sidebar. */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px' }}>
                   <span style={{ width: 10, height: 10, borderRadius: '50%', background: sp.color, flex: 'none' }} />
                   <div
@@ -134,27 +135,31 @@ export function Sidebar(): React.JSX.Element {
           })}
       </div>
 
-      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 12, borderTop: `1px solid ${COLORS.border}` }}>
-        <div
-          onClick={openSettings}
-          className="row-hover"
-          style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, cursor: 'pointer', color: COLORS.textSecondary, fontSize: 14, fontWeight: 500 }}
-        >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="4" y1="8" x2="20" y2="8" /><circle cx="9" cy="8" r="2.4" fill="#0a0a0c" />
-            <line x1="4" y1="16" x2="20" y2="16" /><circle cx="15" cy="16" r="2.4" fill="#0a0a0c" />
-          </svg>
-          <span>Настройки</span>
+      {/* Settings + API-key status — both exist only to configure the AI
+          integration, so the whole footer is hidden while it is off. */}
+      {AI_FEATURES_ENABLED && (
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 12, borderTop: `1px solid ${COLORS.border}` }}>
+          <div
+            onClick={openSettings}
+            className="row-hover"
+            style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, cursor: 'pointer', color: COLORS.textSecondary, fontSize: 14, fontWeight: 500 }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="4" y1="8" x2="20" y2="8" /><circle cx="9" cy="8" r="2.4" fill="#0a0a0c" />
+              <line x1="4" y1="16" x2="20" y2="16" /><circle cx="15" cy="16" r="2.4" fill="#0a0a0c" />
+            </svg>
+            <span>Настройки</span>
+          </div>
+          <div
+            onClick={openSettings}
+            title={hasApiKey ? 'API-ключ подключён' : 'Ключа нет — демо-режим. Открыть настройки'}
+            style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', fontSize: 12, color: COLORS.textFaint, cursor: 'pointer' }}
+          >
+            <div style={{ width: 7, height: 7, borderRadius: '50%', flex: 'none', background: hasApiKey ? COLORS.success : COLORS.textDisabled, boxShadow: hasApiKey ? '0 0 8px oklch(0.72 0.15 150 / 0.6)' : 'none' }} />
+            {hasApiKey ? 'API-ключ подключён' : 'Демо-режим (нет ключа)'}
+          </div>
         </div>
-        <div
-          onClick={openSettings}
-          title={hasApiKey ? 'API-ключ подключён' : 'Ключа нет — демо-режим. Открыть настройки'}
-          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 11px', fontSize: 12, color: COLORS.textFaint, cursor: 'pointer' }}
-        >
-          <div style={{ width: 7, height: 7, borderRadius: '50%', flex: 'none', background: hasApiKey ? COLORS.success : COLORS.textDisabled, boxShadow: hasApiKey ? '0 0 8px oklch(0.72 0.15 150 / 0.6)' : 'none' }} />
-          {hasApiKey ? 'API-ключ подключён' : 'Демо-режим (нет ключа)'}
-        </div>
-      </div>
+      )}
 
       {menu.element}
     </div>
