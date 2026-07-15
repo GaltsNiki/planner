@@ -1,13 +1,26 @@
 import React, { useState } from 'react'
 import { usePlanner } from '../store'
 import { DAY_SHORT, weekModel, weekBadge, currentWeekIndex } from '@shared/dates'
-import { habitAnalytics, overallRate, type HabitDay } from '@shared/habits'
+import { habitAnalytics, type HabitDay } from '@shared/habits'
 import { COLORS } from '../tokens'
 import type { Habit } from '@shared/types'
 
 // Board grid: name | 7 day cells | streak | week count | delete
 const GRID = '1fr repeat(7, 34px) 58px 48px 30px'
 const CELL = 22 // day marker square, centred in its column
+
+// Analytics grid: habit name | 30-day consistency strip
+const GRID_A = '160px 1fr'
+
+/** Russian plural for a day count: 1 день · 2 дня · 5 дней. */
+function pluralDays(n: number): string {
+  const abs = Math.abs(n) % 100
+  const last = abs % 10
+  if (abs >= 11 && abs <= 14) return 'дней'
+  if (last === 1) return 'день'
+  if (last >= 2 && last <= 4) return 'дня'
+  return 'дней'
+}
 
 export function HabitsView(): React.JSX.Element {
   // Share the app-wide week offset so switching tabs keeps you on the same week.
@@ -122,7 +135,7 @@ function HabitRow({ habit, weekOffset, isCurrentWeek }: { habit: Habit; weekOffs
       })}
 
       {/* Current streak — flame + day count, muted when zero. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }} title={streak ? `Серия: ${streak} дн. подряд` : 'Пока нет серии'}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }} title={streak ? `Серия: ${streak} ${pluralDays(streak)} подряд` : 'Пока нет серии'}>
         <FlameIcon active={streak > 0} />
         <span style={{ fontSize: 12.5, fontWeight: 700, color: streak > 0 ? COLORS.accentPartner : COLORS.textDisabled, fontVariantNumeric: 'tabular-nums' }}>{streak}</span>
       </div>
@@ -147,18 +160,17 @@ function HabitRow({ habit, weekOffset, isCurrentWeek }: { habit: Habit; weekOffs
 /* ── Analytics section ──────────────────────────────────────────── */
 
 function HabitsAnalytics({ habits }: { habits: Habit[] }): React.JSX.Element {
-  const week = overallRate(habits, 7)
-  const month = overallRate(habits, 30)
-
   return (
     <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border06}`, borderRadius: 16, padding: '18px 20px 20px', marginTop: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 14 }}>
         <div style={{ fontSize: 15, fontWeight: 700 }}>Аналитика привычек</div>
-        <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>Серии и постоянство за последние 30 дней</div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 22 }}>
-          <SummaryStat label="7 дней" pct={week} />
-          <SummaryStat label="30 дней" pct={month} />
-        </div>
+        <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>Серии и постоянство</div>
+      </div>
+
+      {/* Board header — labels the consistency strip that follows. */}
+      <div style={{ display: 'grid', gridTemplateColumns: GRID_A, gap: 18, marginBottom: 6, padding: '0 10px' }}>
+        <div />
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.5px', color: COLORS.textFaint2, textAlign: 'center' }}>30 ДНЕЙ</div>
       </div>
 
       {/* Per-habit adherence rows */}
@@ -166,9 +178,8 @@ function HabitsAnalytics({ habits }: { habits: Habit[] }): React.JSX.Element {
         {habits.map((h) => <AnalyticsRow key={h.id} habit={h} />)}
       </div>
 
-      {/* Heatmap legend — the strip's colour mapping and time direction. */}
-      <div style={{ display: 'grid', gridTemplateColumns: '150px 120px 1fr', gap: 18, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COLORS.border06}` }}>
-        <div />
+      {/* Heatmap legend — the strip's colour mapping. */}
+      <div style={{ display: 'grid', gridTemplateColumns: GRID_A, gap: 18, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${COLORS.border06}` }}>
         <div />
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, justifyContent: 'flex-end', fontSize: 11, color: COLORS.textFaint }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -177,21 +188,8 @@ function HabitsAnalytics({ habits }: { habits: Habit[] }): React.JSX.Element {
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: 'rgba(255,255,255,0.05)' }} /> пропущено
           </span>
-          <span style={{ color: COLORS.textFaint2 }}>30 дней назад → сегодня</span>
         </div>
       </div>
-    </div>
-  )
-}
-
-/** Compact overall-rate figure shown in the section header. */
-function SummaryStat({ label, pct }: { label: string; pct: number }): React.JSX.Element {
-  return (
-    <div style={{ textAlign: 'right' }}>
-      <div style={{ fontSize: 18, fontWeight: 700, lineHeight: 1, color: COLORS.textPrimary, fontVariantNumeric: 'tabular-nums' }}>
-        {pct}<span style={{ fontSize: 12, fontWeight: 600, color: COLORS.textFaint2 }}>%</span>
-      </div>
-      <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '0.3px', color: COLORS.textFaint, marginTop: 3 }}>{label}</div>
     </div>
   )
 }
@@ -205,7 +203,7 @@ function AnalyticsRow({ habit }: { habit: Habit }): React.JSX.Element {
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{ display: 'grid', gridTemplateColumns: '150px 120px 1fr', gap: 18, alignItems: 'center', padding: '9px 10px', borderRadius: 10, background: hover ? COLORS.rowBg : 'transparent', transition: 'background .12s' }}
+      style={{ display: 'grid', gridTemplateColumns: GRID_A, gap: 18, alignItems: 'center', padding: '9px 10px', borderRadius: 10, background: hover ? COLORS.rowBg : 'transparent', transition: 'background .12s' }}
     >
       {/* Name + best streak */}
       <div style={{ minWidth: 0 }}>
@@ -213,14 +211,8 @@ function AnalyticsRow({ habit }: { habit: Habit }): React.JSX.Element {
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
           <FlameIcon active={a.streak > 0} size={11} />
           <span style={{ fontSize: 11.5, fontWeight: 700, color: a.streak > 0 ? COLORS.accentPartner : COLORS.textDisabled, fontVariantNumeric: 'tabular-nums' }}>{a.streak}</span>
-          <span style={{ fontSize: 11, color: COLORS.textFaint2 }}>дн.{a.best > a.streak ? ` · рекорд ${a.best}` : ''}</span>
+          <span style={{ fontSize: 11, color: COLORS.textFaint2 }}>{pluralDays(a.streak)}{a.best > a.streak ? ` · рекорд ${a.best}` : ''}</span>
         </div>
-      </div>
-
-      {/* 7d / 30d completion rates */}
-      <div style={{ display: 'flex', gap: 14 }}>
-        <RatePill label="7д" pct={a.week.pct} />
-        <RatePill label="30д" pct={a.month.pct} />
       </div>
 
       {/* 30-day consistency heatmap */}
@@ -229,30 +221,19 @@ function AnalyticsRow({ habit }: { habit: Habit }): React.JSX.Element {
   )
 }
 
-/** One completion rate with a thin track meter beneath it. */
-function RatePill({ label, pct }: { label: string; pct: number }): React.JSX.Element {
-  return (
-    <div style={{ minWidth: 38 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.textSecondary, fontVariantNumeric: 'tabular-nums' }}>{pct}</span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: COLORS.textFaint2 }}>%</span>
-      </div>
-      <div style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: '0.3px', color: COLORS.textFaint, marginTop: 1, marginBottom: 3 }}>{label}</div>
-      <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: COLORS.accentGrad, transition: 'width .3s' }} />
-      </div>
-    </div>
-  )
-}
-
 /**
  * 30-day consistency strip: one small cell per day, oldest → newest (today last).
  * Done days carry the accent; missed days a faint track. It reads left-to-right as
  * a timeline, so runs of completions show up as solid accent bands.
+ *
+ * The cells flex to share the column width (capped at 18px each) rather than taking a
+ * fixed width — 30 fixed cells are wider than the column at the board's max width, so
+ * a fixed size made the strip overflow past the card's right edge. `minWidth: 0` lets
+ * the grid track shrink to its fair share instead of the strip's full intrinsic width.
  */
 function Heatmap({ history }: { history: HabitDay[] }): React.JSX.Element {
   return (
-    <div style={{ display: 'flex', gap: 3, alignItems: 'center', justifyContent: 'flex-end' }}>
+    <div style={{ display: 'flex', gap: 3, alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>
       {history.map((d) => {
         const dateLabel = d.date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
         return (
@@ -260,7 +241,7 @@ function Heatmap({ history }: { history: HabitDay[] }): React.JSX.Element {
             key={d.key}
             title={`${dateLabel} — ${d.done ? 'выполнено' : 'пропущено'}`}
             style={{
-              width: 11, height: 22, borderRadius: 3, flex: 'none',
+              flex: '1 1 0', minWidth: 0, maxWidth: 18, height: 24, borderRadius: 4,
               background: d.done ? COLORS.accent : 'rgba(255,255,255,0.05)',
               boxShadow: d.done ? '0 1px 3px rgba(232,86,63,0.22)' : 'none'
             }}

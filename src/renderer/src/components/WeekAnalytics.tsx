@@ -8,6 +8,18 @@ import { COLORS } from '../tokens'
 import type { Goal, Task } from '@shared/types'
 import type { WeekDayStat } from '@shared/progress'
 
+/** Russian plural: forms = [one, few, many], e.g. ['задача','задачи','задач']. */
+function plural(n: number, forms: [string, string, string]): string {
+  const abs = Math.abs(n) % 100
+  const last = abs % 10
+  if (abs >= 11 && abs <= 14) return forms[2]
+  if (last === 1) return forms[0]
+  if (last >= 2 && last <= 4) return forms[1]
+  return forms[2]
+}
+
+const TASKS: [string, string, string] = ['задача', 'задачи', 'задач']
+
 export function WeekAnalytics(): React.JSX.Element {
   const { goals, tasks, weekOffset } = usePlanner()
   const a = weekAnalytics(goals, tasks, weekOffset)
@@ -29,34 +41,29 @@ export function WeekAnalytics(): React.JSX.Element {
         <div style={{ fontSize: 12, color: COLORS.textFaint2 }}>Пн–Вс</div>
       </header>
 
-      {/* ── KPI band: completion rate + week-over-week ─────────── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gap: 12,
-          marginBottom: 20
-        }}
-      >
-        <CompletionTile done={a.done} total={a.total} pct={a.pct} />
-        <DeltaTile deltaPct={a.deltaPct} prevPct={a.prevPct} prevTotal={a.prevTotal} thisPct={a.pct} />
-        <ActiveDaysTile bars={a.bars} />
-      </div>
-
-      {/* ── Body: goal steppers · 7-day distribution ──────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 28, alignItems: 'start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionLabel>Прогресс по этапам целей</SectionLabel>
-          {shown.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: COLORS.textFaint2 }}>Добавьте этапы к целям, чтобы видеть прогресс.</div>
-          ) : (
-            shown.map((g) => <GoalStepper key={g.id} goal={g} tasks={tasks} />)
-          )}
+      {/* ── Body: completion + progress on the left (half width) · a taller
+             day-activity panel fills the right column top-to-bottom ───────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 28, alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <CompletionTile done={a.done} total={a.total} pct={a.pct} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <SectionLabel>Прогресс</SectionLabel>
+            {shown.length === 0 ? (
+              <div style={{ fontSize: 12.5, color: COLORS.textFaint2 }}>Добавьте этапы к целям, чтобы видеть прогресс.</div>
+            ) : (
+              shown.map((g) => <GoalStepper key={g.id} goal={g} tasks={tasks} />)
+            )}
+          </div>
         </div>
 
-        <div>
+        {/* Right column stretches to the left column's height, so the chart —
+            which flexes to fill — is now much taller. Highlights sit at the bottom. */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <SectionLabel>Активность по дням</SectionLabel>
-          <DayDistribution bars={a.bars} />
+          <div style={{ flex: 1, minHeight: 200, display: 'flex' }}>
+            <DayDistribution bars={a.bars} />
+          </div>
+          <WeekHighlights bars={a.bars} done={a.done} />
         </div>
       </div>
     </section>
@@ -107,127 +114,39 @@ function TileLabel({ children }: { children: React.ReactNode }): React.JSX.Eleme
   return <div style={{ fontSize: 11.5, fontWeight: 500, color: COLORS.textMuted }}>{children}</div>
 }
 
-/* ───────────────────────── KPI tiles ─────────────────────────── */
-
-/** Headline completion rate for the week + a thin meter of the same value. */
-function CompletionTile({ done, total, pct }: { done: number; total: number; pct: number }): React.JSX.Element {
+/** A thin progress meter — the shared visual proportion used across the tiles. */
+function Meter({ pct, color }: { pct: number; color: string }): React.JSX.Element {
   return (
-    <Tile>
-      <TileLabel>Выполнение за неделю</TileLabel>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: COLORS.textPrimary }}>
-          {pct}
-          <span style={{ fontSize: 17, fontWeight: 600, color: COLORS.textMuted }}>%</span>
-        </div>
-        <div style={{ fontSize: 12.5, color: COLORS.textFaint }}>
-          {done} из {total} задач
-        </div>
-      </div>
-      {/* Meter: fill carries the rate, track is a faint step of the surface. */}
-      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', marginTop: 6 }}>
-        <div style={{ height: '100%', borderRadius: 3, width: pct + '%', background: COLORS.accentGrad, transition: 'width .3s' }} />
-      </div>
-    </Tile>
+    <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', marginTop: 8 }}>
+      <div style={{ height: '100%', borderRadius: 3, width: Math.min(pct, 100) + '%', background: color, transition: 'width .3s' }} />
+    </div>
   )
 }
 
-/** Week-over-week change in completion rate, coloured by direction. */
-function DeltaTile({
-  deltaPct,
-  prevPct,
-  prevTotal,
-  thisPct
-}: {
-  deltaPct: number
-  prevPct: number
-  prevTotal: number
-  thisPct: number
-}): React.JSX.Element {
-  const hasPrev = prevTotal > 0
-  const up = deltaPct > 0
-  const flat = deltaPct === 0
-  // Up is good → success green; down → muted accent; flat/no-data → neutral ink.
-  const color = !hasPrev || flat ? COLORS.textMuted : up ? COLORS.successFg : COLORS.accentPartner
+/* ───────────────────────── KPI tiles ─────────────────────────── */
 
+/** Tasks completed this week — the count leads, the meter carries the proportion. */
+function CompletionTile({ done, total, pct }: { done: number; total: number; pct: number }): React.JSX.Element {
+  const empty = total === 0
   return (
     <Tile>
-      <TileLabel>Против прошлой недели</TileLabel>
-      {hasPrev ? (
+      <TileLabel>Выполнено за неделю</TileLabel>
+      {empty ? (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <TrendArrow direction={flat ? 'flat' : up ? 'up' : 'down'} color={color} />
-            <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color }}>
-              {up ? '+' : ''}
-              {deltaPct}
-              <span style={{ fontSize: 14, fontWeight: 600 }}> п.п.</span>
-            </div>
-          </div>
-          <div style={{ fontSize: 12.5, color: COLORS.textFaint, marginTop: 2 }}>
-            было {prevPct}% · стало {thisPct}%
-          </div>
+          <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1.1, color: COLORS.textDisabled }}>—</div>
+          <div style={{ fontSize: 12.5, color: COLORS.textFaint }}>нет задач на этой неделе</div>
         </>
       ) : (
         <>
-          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1, color: COLORS.textDisabled }}>—</div>
-          <div style={{ fontSize: 12.5, color: COLORS.textFaint, marginTop: 2 }}>нет данных за прошлую неделю</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: COLORS.textPrimary }}>{done}</span>
+            <span style={{ fontSize: 19, fontWeight: 600, color: COLORS.textMuted }}>/ {total}</span>
+            <span style={{ fontSize: 12.5, color: COLORS.textFaint }}>задач</span>
+          </div>
+          <Meter pct={pct} color={COLORS.accentGrad} />
         </>
       )}
     </Tile>
-  )
-}
-
-/** How many of the 7 days had any planned activity — a scannability metric. */
-function ActiveDaysTile({ bars }: { bars: WeekDayStat[] }): React.JSX.Element {
-  const active = bars.filter((b) => b.has).length
-  return (
-    <Tile>
-      <TileLabel>Дней с задачами</TileLabel>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: COLORS.textPrimary }}>
-          {active}
-          <span style={{ fontSize: 17, fontWeight: 600, color: COLORS.textMuted }}> из 7</span>
-        </div>
-      </div>
-      {/* Seven pips — filled where the day carries tasks. */}
-      <div style={{ display: 'flex', gap: 5, marginTop: 8 }}>
-        {bars.map((b) => (
-          <div
-            key={b.day}
-            title={DAY_SHORT[b.day]}
-            style={{
-              flex: 1,
-              height: 6,
-              borderRadius: 3,
-              background: b.has ? COLORS.accent : 'rgba(255,255,255,0.08)'
-            }}
-          />
-        ))}
-      </div>
-    </Tile>
-  )
-}
-
-/** Up / down / flat trend glyph in a tinted circle. */
-function TrendArrow({ direction, color }: { direction: 'up' | 'down' | 'flat'; color: string }): React.JSX.Element {
-  const path =
-    direction === 'up' ? 'M12 19V5M6 11l6-6 6 6' : direction === 'down' ? 'M12 5v14M6 13l6 6 6-6' : 'M5 12h14'
-  return (
-    <div
-      style={{
-        width: 22,
-        height: 22,
-        borderRadius: '50%',
-        flex: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: color + '22'
-      }}
-    >
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-        <path d={path} />
-      </svg>
-    </div>
   )
 }
 
@@ -236,13 +155,13 @@ function TrendArrow({ direction, color }: { direction: 'up' | 'down' | 'flat'; c
 /**
  * Columns of daily completion. Height (and fill intensity) carry the rate, so the
  * chart reads at a glance even without the numbers. Weekend days are marked in the
- * axis label; hovering a column reveals the exact count.
+ * axis label; hovering a column reveals the exact count. Fills the column height.
  */
 function DayDistribution({ bars }: { bars: WeekDayStat[] }): React.JSX.Element {
   const [hover, setHover] = useState<number | null>(null)
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 108 }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, width: '100%', height: '100%', minHeight: 120 }}>
       {bars.map((b) => {
         const isWeekend = b.day >= 5
         const active = hover === b.day
@@ -254,7 +173,7 @@ function DayDistribution({ bars }: { bars: WeekDayStat[] }): React.JSX.Element {
             key={b.day}
             onMouseEnter={() => setHover(b.day)}
             onMouseLeave={() => setHover(null)}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', position: 'relative', cursor: b.has ? 'default' : 'default' }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', position: 'relative' }}
           >
             {/* Count label above the column. */}
             <div
@@ -300,7 +219,7 @@ function DayDistribution({ bars }: { bars: WeekDayStat[] }): React.JSX.Element {
               {DAY_SHORT[b.day]}
             </div>
 
-            {/* Hover tooltip — exact rate for the day. */}
+            {/* Hover tooltip — the day and its exact count. */}
             {active && b.has && (
               <div
                 style={{
@@ -320,12 +239,45 @@ function DayDistribution({ bars }: { bars: WeekDayStat[] }): React.JSX.Element {
                   pointerEvents: 'none'
                 }}
               >
-                {b.pct}% · {b.done}/{b.total}
+                {DAY_SHORT[b.day]} · {b.done} из {b.total}
               </div>
             )}
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/**
+ * Two at-a-glance facts under the day chart — they use the otherwise empty lower
+ * half of the right column and add insight the raw counts don't: which day went
+ * best, and the average tasks finished per active day.
+ */
+function WeekHighlights({ bars, done }: { bars: WeekDayStat[]; done: number }): React.JSX.Element {
+  const activeDays = bars.filter((b) => b.has)
+  // "Best day" = most tasks finished, tie-broken by the higher completion rate.
+  const best = activeDays.reduce<WeekDayStat | null>((top, b) => {
+    if (!top) return b
+    if (b.done > top.done) return b
+    if (b.done === top.done && b.pct > top.pct) return b
+    return top
+  }, null)
+  const pace = activeDays.length ? Math.round(done / activeDays.length) : 0
+
+  return (
+    <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${COLORS.border06}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <HighlightRow label="Лучший день" value={best && best.done > 0 ? `${DAY_SHORT[best.day]} · ${best.done}/${best.total}` : '—'} />
+      <HighlightRow label="Средний темп" value={activeDays.length ? `${pace} ${plural(pace, TASKS)} в день` : '—'} />
+    </div>
+  )
+}
+
+function HighlightRow({ label, value }: { label: string; value: string }): React.JSX.Element {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+      <span style={{ fontSize: 12, color: COLORS.textMuted }}>{label}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: COLORS.textSecondary, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{value}</span>
     </div>
   )
 }
@@ -348,19 +300,16 @@ function GoalStepper({ goal, tasks }: { goal: Goal; tasks: Task[] }): React.JSX.
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
         <GoalDot color={goal.dotColor} size={8} />
         <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{goal.title}</div>
-        <div style={{ fontSize: 11.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{st.mDone}/{st.mTotal} · {st.pct}%</div>
+        <div style={{ fontSize: 11.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{st.mDone}/{st.mTotal} этапов</div>
       </div>
 
-      {/* Segment tracks — the active stage's bar is taller so it stands out. */}
-      <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end', marginBottom: 6 }}>
-        {segs.map(({ m, pct }) => {
-          const active = m.status === 'active'
-          return (
-            <div key={m.id} style={{ flex: 1, height: active ? 8 : 5, borderRadius: 3, background: COLORS.border06, overflow: 'hidden', boxShadow: active ? `0 0 0 1px ${COLORS.accent35}` : 'none' }}>
-              <div style={{ height: '100%', borderRadius: 3, width: pct + '%', background: active ? COLORS.accentGrad : COLORS.accent, transition: 'width .3s' }} />
-            </div>
-          )
-        })}
+      {/* Stage bars — filled in the goal's own colour, so each goal reads at a glance. */}
+      <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+        {segs.map(({ m, pct }) => (
+          <div key={m.id} style={{ flex: 1, height: 6, borderRadius: 3, background: COLORS.border06, overflow: 'hidden' }}>
+            <div style={{ height: '100%', borderRadius: 3, width: pct + '%', background: goal.dotColor, transition: 'width .3s' }} />
+          </div>
+        ))}
       </div>
 
       {/* Stage labels — coloured like the goal view (no red text); the active bar

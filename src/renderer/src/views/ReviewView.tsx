@@ -27,6 +27,13 @@ function sphereTint(color: string): {
   }
 }
 
+/**
+ * Height of the goal list before it starts scrolling — roughly three goal
+ * cards plus the gaps between them, with a sliver of the next card left
+ * showing so it's clear more goals lie below.
+ */
+const GOALS_SCROLL_MAX = 300
+
 export function ReviewView(): React.JSX.Element {
   const {
     goals, spheres, tasks, selectGoal, openChat, breakDown, openNewGoal, deleteGoal,
@@ -104,7 +111,12 @@ export function ReviewView(): React.JSX.Element {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16, marginBottom: 24, alignItems: 'start' }}>
+      {/* Masonry layout (CSS multi-column) rather than a grid: cards pack
+          directly under one another within each column, so a short card never
+          leaves an empty gap below it while a taller neighbour sets the row
+          height. Column width matches the old grid track; break-inside on each
+          card keeps a sphere from splitting across two columns. */}
+      <div style={{ columnWidth: 340, columnGap: 16, marginBottom: 24 }}>
         {sphereGroups.map(({ sphere: sp, own }) => (
           <SphereCard
             key={sp.id}
@@ -187,7 +199,7 @@ function SphereCard(props: SphereCardProps): React.JSX.Element {
   const roll = sphereStatsOf(goals, tasks)
 
   return (
-    <section style={{ background: tint.fill, border: `1px solid ${tint.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <section style={{ background: tint.fill, border: `1px solid ${tint.border}`, borderRadius: 16, overflow: 'hidden', display: 'flex', flexDirection: 'column', breakInside: 'avoid', marginBottom: 16 }}>
       {/* Header band — tinted in the sphere colour, with a solid colour spine on
           the left edge as an unmistakable "this is the sphere colour" marker. */}
       <div style={{ position: 'relative', background: tint.band, padding: '14px 16px 14px 18px', borderBottom: `1px solid ${tint.border}` }}>
@@ -268,11 +280,27 @@ function SphereCard(props: SphereCardProps): React.JSX.Element {
         )}
       </div>
 
-      {/* Goals in this sphere, then a slim add-goal row. */}
+      {/* Goals in this sphere, then a slim add-goal row. Beyond three goals the
+          list scrolls inside a fixed height instead of growing the card taller,
+          so a crowded sphere stays the same size as its neighbours and opens no
+          gap in the layout. The add-goal row sits below the scroll area and
+          stays reachable. The negative right margin lets the scrollbar sit in
+          the card's gutter, keeping the goal cards horizontally centred. */}
       <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {goals.map((g) => (
-          <GoalCard key={g.id} goal={g} sphereColor={sp.color} tasks={tasks} onOpen={() => onOpenGoal(g.id)} onDelete={() => onDeleteGoal(g.id)} />
-        ))}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            ...(goals.length > 3
+              ? { maxHeight: GOALS_SCROLL_MAX, overflowY: 'auto', marginRight: -14, paddingRight: 14 }
+              : null)
+          }}
+        >
+          {goals.map((g) => (
+            <GoalCard key={g.id} goal={g} sphereColor={sp.color} tasks={tasks} onOpen={() => onOpenGoal(g.id)} onDelete={() => onDeleteGoal(g.id)} />
+          ))}
+        </div>
         <button
           onClick={onAddGoal}
           className="row-hover"
