@@ -728,3 +728,80 @@ reworks the toolbar around them.
   - `spheres-after-7spheres-top.png` — 7 spheres: band wraps to two rows cleanly,
     correct `7 сфер · 4 цели` pluralisation, new spheres colour-matched across the
     band, cards and sidebar.
+
+---
+
+# Frontend changes — Habits view redesign (2026-07-16 pass)
+
+A second design pass over the **Habits** view, focused on layout, glanceability, and
+Fitts's-Law/Gestalt improvements on top of the existing analytics feature. **Scope:
+front-end / UI only.** The single source file changed is
+`src/renderer/src/views/HabitsView.tsx`. No data models, business logic, or other views
+were touched. All habit analytics (`@shared/habits.ts`), the seed data, and the store API
+were reused as-is — `overallRate`, `habitAnalytics`, `habitRate`, `weekBadge`, and the
+store's `thisWeek()` action already existed and are now surfaced in the UI.
+
+Reference screenshot of the result: `habits-final.png`.
+
+## What changed (and the design principle behind each)
+
+### 1. New summary bar above the fold — *Above the fold · Visual hierarchy (F-pattern)*
+Added a `SummaryBar` at the very top of the view: four equally-sized stat tiles.
+- **Эта неделя** — overall completion across all habits over 7 days (`overallRate(habits, 7)`).
+- **30 дней** — overall completion over 30 days (`overallRate(habits, 30)`).
+- **Привычек** — active habit count.
+- **Лучшая серия** — strongest current streak across all habits, with a flame glyph.
+
+The most valuable "how am I doing?" signal now sits in the top third, forming the top bar
+of the F-pattern scan before any per-habit detail. Percentage tiles tint their value by
+strength (accent ≥ 70%, partner ≥ 40%, muted below). The four tiles share identical size,
+shape, radius, padding and label style (*Gestalt similarity*) so they read as one group.
+
+### 2. "Эта неделя" reset button — *Fitts's Law · Window zoning (Z-pattern terminus)*
+When off the current week, an accent "Эта неделя" pill appears in the previously-empty
+top-right corner of the week navigator (`marginLeft: auto`) as a one-click way back — the
+Z-pattern's top-right terminus. Only shown when `!isCurrentWeek`. Wired to `thisWeek()`.
+
+### 3. Larger day-toggle cells with checkmarks — *Fitts's Law · Similarity (non-colour state)*
+Day cells are the most frequent action, so the day column widened `34→38px` and the marker
+grew `22→30px` (radius `7→9`). Completed cells now render a white ✓ inside, so the done
+state doesn't depend on the accent colour alone (colour-vision accessibility).
+
+### 4. Stronger "today" column cue — *Visual hierarchy · Window zoning*
+The current day already highlighted its weekday header; now its empty cells carry an
+accent tint (`accent12`), turning the current day into a clear vertical scan guide down
+the board. Applied only on the current week.
+
+### 5. Per-habit adherence rates in analytics — *Window zoning (right = contextual detail)*
+The analytics grid gained two right-hand columns, **7 ДН** and **30 ДН**, showing each
+habit's rolling completion percentage (from `habitAnalytics`), tinted by strength to match
+the summary tiles. This puts adherence detail on the right edge — the contextual-detail
+zone — legible without counting heatmap cells. Grid: `160px 1fr` → `190px 1fr 54px 54px`.
+
+### 6. Heatmap cells matched to board cells — *Gestalt similarity*
+The 30-day strip cells were tall bars (`≈16×24`, radius 4); they're now near-square
+(`18×18`, radius 5) so the "done = accent square" mark reads identically in the board and
+the strip. The two sections now feel like one tracker rather than two unrelated tables.
+
+### 7. Spacing / alignment polish — *Grid & spacing*
+- Content column widened `720→760px` for more board/heatmap breathing room.
+- Vertical rhythm between summary, navigator, board and analytics normalised toward the
+  8px grid (e.g. analytics card top gap `20→16`).
+- Legend swatch radius bumped `2→3` to match the new cell radii.
+
+## What was intentionally left unchanged
+- All streak / rate / heatmap math in `@shared/habits.ts` (reused, not modified).
+- Seed data, and the add/rename/toggle/delete interactions and their store actions.
+- The week navigator's core mechanics (prev/next arrows, range label, badge).
+
+## Verification
+- `npx tsc --noEmit -p tsconfig.web.json` — passes (exit 0).
+- `npx vitest run src/shared/__tests__/habits.test.ts` — 17/17 pass.
+- Rendered via the project's `vite.preview.config.ts` harness and screenshotted the
+  current-week state, the off-week state (reset button + no today-highlight), and the
+  analytics section. Final current-week view saved as `habits-final.png`.
+
+### How it was previewed
+The renderer depends on the Electron `window.planner` IPC bridge, so it was run in a plain
+browser via the committed `vite.preview.config.ts` + `web-preview.html` harness (which
+stubs `window.planner` with seed data). No throwaway scaffolding was added to the repo.
