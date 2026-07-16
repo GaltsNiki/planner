@@ -13,13 +13,26 @@ function NavItem({
   return (
     <div
       onClick={onClick}
+      // `nav-item-active` disables the CSS hover-lift so the accent fill stays put.
+      className={`nav-item${active ? ' nav-item-active' : ''}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 11, padding: '9px 11px', borderRadius: 10, cursor: 'pointer',
+        position: 'relative',
+        display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
         background: active ? COLORS.accent13 : 'transparent',
         color: active ? COLORS.accent : COLORS.textSecondary,
         fontSize: 14, fontWeight: active ? 600 : 500
       }}
     >
+      {/* Left indicator bar — a stronger, edge-anchored "you are here" marker than
+          the fill alone, and it lines the active row up against the panel's edge. */}
+      {active && (
+        <span
+          style={{
+            position: 'absolute', left: -14, top: 8, bottom: 8, width: 3,
+            borderRadius: '0 3px 3px 0', background: COLORS.accent
+          }}
+        />
+      )}
       {icon}
       <span>{label}</span>
     </div>
@@ -60,9 +73,14 @@ export function Sidebar(): React.JSX.Element {
 
   const menu = useContextMenu()
 
+  // Goals shown in the sidebar's lower zone — used for the section-header count so
+  // the label reads as a real, quantified group rather than a bare caption.
+  const totalGoals = goals.length
+
   return (
-    <div style={{ width: 264, flex: 'none', display: 'flex', flexDirection: 'column', background: COLORS.sidebarBg, borderRight: `1px solid ${COLORS.border}`, padding: '18px 14px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 8px 20px' }}>
+    <div style={{ width: 264, flex: 'none', display: 'flex', flexDirection: 'column', background: COLORS.sidebarBg, borderRight: `1px solid ${COLORS.border}`, padding: '16px 16px 12px' }}>
+      {/* ── Top zone: brand + collapse (global chrome) ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 4px 16px' }}>
         <img src="/icon.png" alt="Planner" width={28} height={28} style={{ flex: 'none', borderRadius: '50%', boxShadow: '0 2px 8px rgba(245,138,31,0.35)' }} />
         <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.2px' }}>Planner</div>
         <button
@@ -75,61 +93,81 @@ export function Sidebar(): React.JSX.Element {
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {/* ── Navigation zone (the four main views) ── */}
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         <NavItem active={view === 'today'} label="Сегодня" onClick={() => setView('today')} icon={icons.today} />
         <NavItem active={view === 'week'} label="Неделя" onClick={() => setView('week')} icon={icons.week} />
         <NavItem active={view === 'habits'} label="Привычки" onClick={() => setView('habits')} icon={icons.habits} />
         <NavItem active={view === 'review'} label="Сферы жизни" onClick={() => setView('review')} icon={icons.review} />
-      </div>
+      </nav>
 
-      <div style={{ display: 'flex', alignItems: 'center', margin: '22px 8px 8px' }}>
-        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled }}>СФЕРЫ ЖИЗНИ</div>
+      {/* Divider binds navigation (above) apart from the goals list (below) as two
+          distinct common regions, instead of two look-alike uppercase captions. */}
+      <div style={{ height: 1, background: COLORS.border, margin: '16px 4px 4px' }} />
+
+      {/* ── Goals zone header ── Labelled «МОИ ЦЕЛИ», not «СФЕРЫ ЖИЗНИ», so it no
+          longer collides with the identically-named nav item above. Shows a count. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 8px 6px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.7px', color: COLORS.textMuted }}>МОИ ЦЕЛИ</div>
+        {totalGoals > 0 && (
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: COLORS.textDisabled, fontVariantNumeric: 'tabular-nums' }}>{totalGoals}</span>
+        )}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', margin: '0 -4px', padding: '0 4px' }}>
         {spheres
           .map((sp) => ({ sphere: sp, own: goals.filter((g) => resolveSphereId(g, spheres) === sp.id) }))
           // Hide the "Разное" fallback group unless it actually holds goals.
           .filter((grp) => grp.sphere.id !== UNSORTED_SPHERE_ID || grp.own.length > 0)
           .map(({ sphere: sp, own }) => {
             return (
-              <div key={sp.id} style={{ marginBottom: 6 }}>
+              <div key={sp.id} style={{ marginBottom: 10 }}>
                 {/* Sphere header — read-only here; spheres and their goals are
-                    created in the «Сферы жизни» view, not from the sidebar. */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px' }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: sp.color, flex: 'none' }} />
+                    created in the «Сферы жизни» view, not from the sidebar. Lighter
+                    weight than the «МОИ ЦЕЛИ» section label so the two roles differ. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px 6px' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: sp.color, flex: 'none', boxShadow: `0 0 6px ${sp.color}66` }} />
                   <div
-                    style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    style={{ flex: 1, minWidth: 0, fontSize: 10.5, fontWeight: 600, letterSpacing: '0.6px', color: COLORS.textDisabled, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                   >
                     {sp.title.toUpperCase()}
                   </div>
                 </div>
 
-                {/* Goals in this sphere — no goal dot; the title and bar are indented
-                    to line up under the sphere name. */}
-                {own.map((g) => {
-                  const st = goalStats(g, tasks)
-                  const active = view === 'goal' && activeGoalId === g.id
-                  return (
-                    <div
-                      key={g.id}
-                      onClick={() => selectGoal(g.id)}
-                      onContextMenu={menu.open([
-                        { label: 'Открыть цель', onClick: () => selectGoal(g.id) },
-                        { label: 'Изменить цель', onClick: () => openEditGoal(g.id) },
-                        { label: 'Удалить цель', danger: true, onClick: () => deleteGoal(g.id) }
-                      ])}
-                      style={{ padding: '9px 10px 9px 26px', borderRadius: 10, cursor: 'pointer', background: active ? 'rgba(255,255,255,0.05)' : 'transparent' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                        <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: '#e6e6e8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</div>
-                        <div style={{ fontSize: 11.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{st.pct}%</div>
+                {/* Goals in this sphere. A hairline rail on the left, in the sphere's
+                    colour, binds a sphere's goals together as one group (common region)
+                    and carries the sphere colour down into its goals (similarity). */}
+                <div style={{ marginLeft: 12, paddingLeft: 10, borderLeft: `1px solid ${sp.color}33`, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {own.map((g) => {
+                    const st = goalStats(g, tasks)
+                    const active = view === 'goal' && activeGoalId === g.id
+                    return (
+                      <div
+                        key={g.id}
+                        onClick={() => selectGoal(g.id)}
+                        className={`nav-goal${active ? ' nav-goal-active' : ''}`}
+                        onContextMenu={menu.open([
+                          { label: 'Открыть цель', onClick: () => selectGoal(g.id) },
+                          { label: 'Изменить цель', onClick: () => openEditGoal(g.id) },
+                          { label: 'Удалить цель', danger: true, onClick: () => deleteGoal(g.id) }
+                        ])}
+                        // Active goal is tinted in its own sphere colour so the
+                        // selection is obvious and colour-consistent with the header.
+                        style={{
+                          padding: '8px 10px', borderRadius: 9, cursor: 'pointer',
+                          background: active ? `${g.dotColor}1f` : 'transparent'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: active ? 600 : 500, color: active ? COLORS.textPrimary : '#dcdce0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.title}</div>
+                          <div style={{ fontSize: 11.5, fontWeight: 600, color: active ? g.dotColor : COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{st.pct}%</div>
+                        </div>
+                        <div style={{ height: 4, borderRadius: 3, background: 'rgba(255,255,255,0.06)', marginTop: 7, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: 3, background: g.dotColor, width: st.pct + '%' }} />
+                        </div>
                       </div>
-                      <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.07)', marginTop: 8, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', borderRadius: 2, background: g.dotColor, width: st.pct + '%' }} />
-                      </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             )
           })}

@@ -44,6 +44,14 @@ input, textarea { font-family: inherit; }
 .row-hover:hover { background: #1e1e22 !important; }
 .card-hover:hover { background: #17171a !important; }
 
+/* Sidebar navigation rows: quiet background lift on hover for a clear,
+   full-width target (an inactive item shows it changes the view when hovered). */
+.nav-item { transition: background .12s, color .12s; }
+.nav-item:not(.nav-item-active):hover { background: rgba(255,255,255,0.055); color: #e6e6e8; }
+/* Sidebar goal rows: same lift, but they never carry the active-nav class. */
+.nav-goal { transition: background .12s; }
+.nav-goal:not(.nav-goal-active):hover { background: rgba(255,255,255,0.04); }
+
 /* Week mini-card zones */
 .mini-open:hover { text-decoration: underline; text-underline-offset: 2px; }
 

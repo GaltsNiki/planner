@@ -355,3 +355,124 @@ colour-coded life areas.
   next palette colour), added a goal into it (goal inherited the sphere colour),
   and overrode a sphere's colour (the change propagated to its header, rollup, goal
   dot and goal progress bar in one action).
+
+---
+---
+
+# Frontend changes — Sidebar (shared navigation panel) redesign
+
+Front-end / UI work on the **Sidebar** (`src/renderer/src/components/Sidebar.tsx`),
+the navigation panel shared by the Daily, Weekly, Habits and Spheres views. No data
+models, business logic, or the internal content of any view were touched — the change
+is confined to the sidebar's own presentation (nav items, section structure,
+active/hover states, spacing, and the goals list). Two hover-helper CSS classes were
+added to the shared stylesheet.
+
+## Files changed
+
+| File | Change |
+|------|--------|
+| `src/renderer/src/components/Sidebar.tsx` | Restructured layout into clear zones; new active/hover states; fixed the duplicate-label problem; sphere-colour goal grouping |
+| `src/renderer/src/styles.css` | Added `.nav-item` / `.nav-goal` CSS hover classes (background-lift on hover, driven by CSS not JS) |
+
+## Problems in the original sidebar (measured against the design principles)
+
+1. **Duplicate / ambiguous labels (Gestalt similarity, hierarchy).** The panel had a
+   nav item **«Сферы жизни»** *and*, just below, an uppercase section caption
+   **«СФЕРЫ ЖИЗНИ»** for the goals list — two different controls that read almost
+   identically. The section caption used the same faint disabled ink and uppercase
+   treatment as each sphere's own header, so all three levels looked alike.
+2. **No boundary between zones (common region).** Navigation and the goals list ran
+   together with only whitespace between them; nothing bound each as its own region.
+3. **Weak states (Fitts's Law, similarity).**
+   - Nav items had **no hover feedback** at all — an inactive target gave no signal it
+     was clickable.
+   - The active nav item was a fill tint only, with no edge-anchored marker.
+   - The active **goal** row used `rgba(255,255,255,0.05)` — practically invisible.
+4. **Colour identity didn't carry.** Sphere colours drove the Spheres view's cards,
+   but in the sidebar the goal rows were monochrome apart from a 3px bar, so the
+   sidebar didn't visually tie back to the colour-coded spheres.
+5. **Off-grid spacing.** Padding/margins were a mix of 2 / 9 / 11 / 22 px with no
+   consistent rhythm.
+
+## What changed
+
+### 1. Explicit zones with a common-region divider
+The panel is now three clearly separated regions, top-to-bottom, matching the
+**window-zoning** principle (top = brand/global chrome, then navigation, then the
+goals list):
+
+- **Top:** brand (logo + "Planner") + collapse button — unchanged behaviour, tidied
+  spacing.
+- **Navigation:** the four view links, wrapped in a semantic `<nav>`.
+- A **1px hairline divider** binds navigation apart from the goals list below, so the
+  two are read as distinct **common regions** instead of two look-alike captions.
+
+### 2. Fixed the duplicate-label problem
+The goals-section caption was renamed from **«СФЕРЫ ЖИЗНИ»** to **«МОИ ЦЕЛИ»**, so it
+no longer collides with the «Сферы жизни» nav item. It now also shows a **goal count**
+beside it, so it reads as a real, quantified group header rather than a bare caption.
+Its ink was lifted (from `textDisabled` to a heavier `textMuted` at 700 weight) so the
+section header outranks the individual sphere headers beneath it — a clear
+**visual hierarchy** (section → sphere → goal).
+
+### 3. Stronger, consistent states (Fitts's Law + similarity)
+- **Nav hover:** new `.nav-item` CSS class gives every inactive nav row a quiet
+  background-lift + brighter text on hover, so the full-width row reads as a target.
+- **Active nav item:** keeps the accent fill **and** gains a **left indicator bar**
+  pinned to the panel edge (`left: -14px`), an edge-anchored "you are here" marker
+  (Fitts's Law — the border is effectively an infinite-width target) that's far more
+  legible than a fill alone.
+- **Active goal row:** now tinted in **its own sphere's colour** (`${color}1f`), with
+  the `%` figure and title also picking up the sphere colour / heavier weight — the
+  selection is obvious and colour-consistent with the sphere it belongs to (previously
+  near-invisible). New `.nav-goal` hover class gives inactive goal rows a lift too.
+
+### 4. Sphere-colour grouping (common region + similarity)
+Each sphere's goals now sit inside a **hairline rail on the left in the sphere's own
+colour** (`borderLeft: 1px solid ${color}33`, indented), which:
+- **binds** a sphere's goals together as one group (common region), and
+- **carries the sphere colour** down into its goals, so the sidebar now matches the
+  colour-coded cards in the Spheres view (coral Здоровье, amber Развитие, green
+  Карьера, teal Досуг — verified side by side).
+
+Sphere-header dots gained a soft colour glow, and goal progress bars were thickened
+from 3px to 4px with a fuller radius for legibility.
+
+### 5. Grid & spacing
+Spacing was snapped onto a consistent 4/8-px-based rhythm: panel padding `16px`, nav
+gap `3`, item padding `10×12`, divider margins `16/4`, goal group gap `3` and
+`10px` bottom spacing between spheres. The goals scroll region is now `flex: 1`
+(`minHeight: 0`), so the panel fills the full height cleanly and the goals list, not
+empty space, absorbs any extra room.
+
+> Note on the footer: the Settings + API-key footer is gated behind
+> `AI_FEATURES_ENABLED`, which is currently `false`, so it stays hidden — it was left
+> exactly as-is (out of scope, and it only configures the disabled AI integration).
+
+All colours come from the existing `COLORS` token set / the spheres' own colours — no
+new palette was introduced.
+
+## Verification
+
+- `npx tsc --noEmit -p tsconfig.web.json` → clean (exit 0).
+- `npx vitest run` → **98/98 passing** (UI-only change; no logic touched).
+- Rendered in the browser preview harness (`web-preview.html` via
+  `vite.preview.config.ts`) and screenshotted the sidebar in **all four views**:
+  - **Daily / Today** — active accent bar on «Сегодня».
+  - **Weekly** — active bar on «Неделя», panel unaffected by the week board.
+  - **Habits** — active bar on «Привычки».
+  - **Spheres** — sidebar rails/dots line up in colour with the Spheres cards.
+  - **Active goal** state (sphere-colour tint + coloured %) by selecting a goal.
+  - **Collapse / expand** round-trips correctly (hide → header expand button → show).
+
+## Screenshots captured during the work
+
+- `sidebar-crop-before.png` — original sidebar (cramped, duplicate caption, invisible
+  active goal state).
+- `sidebar-crop-after.png` — redesigned sidebar (zones, divider, «МОИ ЦЕЛИ» + count,
+  sphere rails, active bar).
+- `sidebar-active-goal-after.png` — active goal tinted in its sphere colour.
+- `sidebar-habits-after.png`, `sidebar-spheres-after.png`, `sidebar-week-crop-after.png`
+  — the shared panel verified in each view.
+- `sidebar-collapsed-after.png` — collapsed state.
