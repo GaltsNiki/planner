@@ -5,10 +5,14 @@ import { useContextMenu } from './ContextMenu'
 import { COLORS } from '../tokens'
 import type { Task, Goal } from '@shared/types'
 
-/** Click-to-edit task row with a delete button + right-click delete, used in the Today view. */
+/**
+ * Click-to-edit task row with a delete button + right-click delete, used in the Today view.
+ * `hideTime` suppresses the right-side time chip when the Today agenda already shows
+ * the time in its left gutter, so the time isn't printed twice on the same row.
+ */
 export function TaskRow({
-  task, goal, caption, onCaption
-}: { task: Task; goal: Goal; caption?: string; onCaption?: () => void }): React.JSX.Element {
+  task, goal, caption, onCaption, hideTime
+}: { task: Task; goal: Goal; caption?: string; onCaption?: () => void; hideTime?: boolean }): React.JSX.Element {
   const { toggleTask, deleteTask, openEditor } = usePlanner()
   const menu = useContextMenu()
   const [hover, setHover] = useState(false)
@@ -16,7 +20,11 @@ export function TaskRow({
 
   const li = linkify(task.desc || '')
   const time = extractTime(task.desc || '')
-  // Don't repeat the time in the description line — it's already shown as a chip.
+  // Show the time chip only when the surrounding view isn't already showing the
+  // time itself (the Today agenda prints it in its left gutter).
+  const showTimeChip = !hideTime && !!time
+  // Always strip the time from the description line so it isn't repeated inline,
+  // regardless of where the chip is shown.
   const textNoTime = stripTime(li.textOnly, time)
   const short = textNoTime || (li.primary ? 'Ссылка: ' + li.primary.label : '')
 
@@ -86,7 +94,7 @@ export function TaskRow({
 
       {/* Right cluster: time chip, optional link chip and the delete button, top-aligned. */}
       <div style={{ flex: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-        {time && (
+        {showTimeChip && (
           <span style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: 7, background: COLORS.accent14, color: COLORS.accentPartner, fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
         )}
 

@@ -1,3 +1,103 @@
+# Frontend changes — Daily view redesign
+
+Scope: front-end / UI changes to the **Daily view** (`Сегодня` / `TodayView`) only.
+Data models, business logic, and the other views (Weekly, Habits, Spheres) were
+left untouched. One **shared** component used exclusively by the Daily view —
+`TaskRow` — was extended with an opt-in prop; no other view consumes it.
+
+## Design problems in the old Daily view (evaluated against the design principles)
+
+Screenshots of the current view were taken with the browser preview harness
+(`web-preview.html` on the standalone Vite preview server) and evaluated against
+the seven design principles:
+
+1. **Fitts's Law — violated.** Day-navigation arrows were small (30×30) and
+   floated in the centre of the canvas; the prev/next-day labels were tiny, faint
+   text; the primary "add task" action was a low-contrast dashed strip in the
+   middle of the page. Nothing used the screen edges.
+2. **Window zoning — violated.** No real top toolbar. The date navigator was
+   centred rather than anchored, and the day's summary (progress) lived in a
+   separate card lower down, detached from navigation.
+3. **Above the fold — weak.** At 1440×900 the content filled only the top ~55%,
+   leaving a large dead void; the centred `maxWidth: 760` column wasted most of the
+   horizontal space.
+4. **Visual hierarchy / scan — weak.** Although the agenda is time-ordered, the
+   time was shown as a chip on the far right of each row — you could not scan a
+   time column, and the time was detached from the task it belonged to.
+5. **Gestalt proximity / common region — partial.** The progress card and the add
+   button floated away from the list they related to.
+
+## What changed (`src/renderer/src/views/TodayView.tsx`)
+
+### 1. A real top toolbar (`DayToolbar`) — zoning + Fitts's Law
+Replaced the centred `DateNavigator` with a left-anchored toolbar row:
+- **Larger stepper arrows** (30×30 → **38×38**, radius 11) with hover feedback and
+  tooltips — bigger, easier targets.
+- The **date label is the calendar trigger** (with its own hover surface), tight
+  next to the arrows (proximity grouping).
+- A **"Сегодня" jump chip** appears only when you've navigated off today, giving a
+  one-click return to the real current day.
+- The **day progress meter + `done / total` count is pinned to the right edge** of
+  the same toolbar (`margin-left: auto`), so navigation and the day's summary read
+  as one top zone and sit above the fold. Turns **green** at 100%.
+- The old standalone "Прогресс дня" card was removed (its information now lives in
+  the toolbar), reclaiming vertical space.
+
+### 2. A scannable time "spine" (`AgendaEntry`) — visual hierarchy
+Each task now renders inside an agenda entry with a **fixed-width left time gutter**
+(`TIME_GUTTER = 62`). The task's time is shown there, right-aligned and tabular, so
+every time lines up in a single column you can scan top-to-bottom (F-pattern).
+Tasks without a time show a small goal-coloured dot in the gutter instead. Because
+the gutter is now the single source of the time, the redundant right-side time chip
+on the row is suppressed (see the `TaskRow` change below).
+
+### 3. A "now" marker (`NowMarker`) — signposting what's next
+On the **real today only**, a thin accent rule labelled **`СЕЙЧАС`** is dropped into
+the agenda at the current wall-clock time — before the first task scheduled later
+than now (or after the last timed task when everything is past). It makes the most
+relevant part of the day easy to find. Only renders when the day has at least one
+timed task.
+
+### 4. A friendly empty state — Fitts's Law + no dead void
+When a day has no tasks, instead of a thin dashed strip the view shows a **large,
+centred, clickable placeholder** (accent "+" tile + "На этот день пока нет задач" /
+"Нажмите, чтобы добавить первую"). The whole block is the add target.
+
+### 5. Add button attached to the list — action–result proximity
+When the day has tasks, the "Добавить задачу" button sits directly at the end of
+the list it appends to, indented to align with the agenda column (not the time
+gutter).
+
+### 6. Wider content column
+`maxWidth` raised from **760 → 880** so the agenda uses more of the available width
+and less of the screen is empty.
+
+## Shared component change (`src/renderer/src/components/TaskRow.tsx`)
+
+`TaskRow` is used **only** by the Daily view (its own doc-comment says so). Added an
+opt-in **`hideTime`** prop:
+- When set, the right-side time chip is not rendered (the Daily agenda already shows
+  the time in its gutter).
+- The time is **still parsed and still stripped from the inline description line**
+  regardless of `hideTime`, so a time embedded in a description is never printed
+  twice. This is handled by keeping the real `time` for stripping and gating only
+  the chip render behind a new `showTimeChip` flag.
+
+Default behaviour (no prop) is unchanged.
+
+## Verification
+
+- `npm run typecheck` (node + web) — clean.
+- `npm test` — **98/98** tests pass.
+- Verified in the browser preview: default today (untimed → gutter dots), a day
+  with timed tasks (aligned `07:00`/`21:00` spine, no duplicate chips), the
+  `СЕЙЧАС` marker placed between a past and an upcoming task, the "Сегодня" jump
+  chip off-today, and the empty-state placeholder.
+- Temporary seed edits used only to visualise the timed/now states were reverted;
+  `src/shared/seed.ts` is unchanged.
+
+---
+
 # Frontend changes — Weekly view redesign
 
 Scope: front-end / UI changes to the **Weekly view** (`Неделя`) only. Data models,
