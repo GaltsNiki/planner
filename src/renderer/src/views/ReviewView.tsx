@@ -99,6 +99,18 @@ export function ReviewView(): React.JSX.Element {
     .map((sphere) => ({ sphere, own: goals.filter((g) => resolveSphereId(g, spheres) === sphere.id) }))
     .filter((grp) => grp.sphere.id !== UNSORTED_SPHERE_ID || grp.own.length > 0)
 
+  // Overall "life balance" rollup for the summary band above the grid: mean
+  // progress across all spheres, plus totals and a per-sphere breakdown (each in
+  // its own colour) so the whole picture reads in one glance before the cards.
+  const sphereRollups = sphereGroups.map(({ sphere, own }) => ({
+    sphere,
+    stats: sphereStatsOf(own, tasks)
+  }))
+  const totalGoals = sphereRollups.reduce((n, s) => n + s.stats.goalCount, 0)
+  const balancePct = sphereRollups.length
+    ? Math.round(sphereRollups.reduce((n, s) => n + s.stats.pct, 0) / sphereRollups.length)
+    : 0
+
   // A drop finishes a reorder: move the dragged sphere into the target's slot.
   const onDragEnd = (e: DragEndEvent): void => {
     const { active, over } = e
@@ -123,6 +135,23 @@ export function ReviewView(): React.JSX.Element {
         </div>
       )}
 
+      {/* Life-balance summary band — the view's headline, sitting in the top third
+          (above the fold) so the whole picture lands first: overall mean progress
+          as a large figure, the count of spheres/goals, and a single bar split into
+          one segment per sphere (each in its own colour, width = its progress) so
+          balance across areas of life reads at a glance. The primary "add sphere"
+          action lives here too, as a filled accent button anchored to the right
+          edge — large and high-contrast (Fitts's law) rather than a faint chip. */}
+      {sphereRollups.length > 0 && (
+        <LifeBalanceBand
+          rollups={sphereRollups}
+          balancePct={balancePct}
+          sphereCount={sphereRollups.length}
+          totalGoals={totalGoals}
+          onAddSphere={addAndEditSphere}
+        />
+      )}
+
       {/* Spheres of life — a responsive grid of sphere cards so the areas of life
           read as a group at a glance and fill the full width of the window. Each
           card is painted in its sphere's colour (fill, border, header band,
@@ -130,23 +159,23 @@ export function ReviewView(): React.JSX.Element {
           their header to reorder the dashboard. Spheres are created, renamed,
           recoloured and deleted right here; goals are added straight into a sphere. */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 2px 14px', flexWrap: 'wrap' }}>
-          {sphereGroups.length > 1 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: COLORS.textFaint2, fontSize: 12.5 }}>
-              <GripIcon />
-              Перетащите карточку за уголок, чтобы изменить порядок сфер
-            </div>
-          ) : (
-            <div />
-          )}
-          <button
-            onClick={addAndEditSphere}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 9, background: 'transparent', border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
-            Добавить сферу
-          </button>
-        </div>
+        {/* When there are no spheres yet, the summary band is hidden, so the
+            "add sphere" action needs a home here — a prominent primary button. */}
+        {sphereRollups.length === 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '0 2px 14px' }}>
+            <PrimaryAddSphere onClick={addAndEditSphere} />
+          </div>
+        )}
+
+        {/* Quiet reorder hint — a small, low-priority affordance beside the grid
+            only when reordering is actually possible. It no longer competes with
+            the primary action for the top-left of the screen. */}
+        {sphereGroups.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '0 2px 12px', color: COLORS.textFaint2, fontSize: 12 }}>
+            <GripIcon />
+            Перетащите карточку за уголок, чтобы изменить порядок
+          </div>
+        )}
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
           <SortableContext items={sphereGroups.map((g) => g.sphere.id)} strategy={rectSortingStrategy}>
@@ -182,6 +211,94 @@ export function ReviewView(): React.JSX.Element {
       </div>
     </div>
   )
+}
+
+/**
+ * The primary "add sphere" action: a filled accent button. Kept as one component
+ * so the summary band and the empty-state both render the exact same control.
+ * Large target + strong contrast + edge placement — easy to hit (Fitts's law).
+ */
+function PrimaryAddSphere({ onClick }: { onClick: () => void }): React.JSX.Element {
+  return (
+    <button
+      onClick={onClick}
+      className="card-hover"
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 18px', borderRadius: 11, background: COLORS.accent, border: 'none', color: '#fff', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', flex: 'none', boxShadow: '0 2px 10px rgba(232,86,63,0.28)' }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 6v12M6 12h12" /></svg>
+      Добавить сферу
+    </button>
+  )
+}
+
+interface LifeBalanceBandProps {
+  rollups: { sphere: { id: string; title: string; color: string }; stats: { pct: number; goalCount: number } }[]
+  balancePct: number
+  sphereCount: number
+  totalGoals: number
+  onAddSphere: () => void
+}
+
+/**
+ * The headline summary of the whole view: overall life-balance progress. It gives
+ * the top third of the screen a strong first fixation (F/Z-pattern entry point)
+ * before the eye drops into the grid of cards, and hosts the primary create action
+ * at the screen's right edge.
+ *
+ * Left: the big mean-progress figure + a spheres/goals count.
+ * Right: the primary "add sphere" button.
+ * Below: one segment per sphere — each in its own colour, its fill encoding that
+ * sphere's progress — so which areas of life lead and which lag reads instantly,
+ * and the per-sphere colours here match the cards below (Gestalt similarity).
+ */
+function LifeBalanceBand(props: LifeBalanceBandProps): React.JSX.Element {
+  const { rollups, balancePct, sphereCount, totalGoals, onAddSphere } = props
+  return (
+    <div style={{ background: COLORS.cardBg, border: `1px solid ${COLORS.border06}`, borderRadius: 18, padding: '20px 24px 22px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, minWidth: 0 }}>
+          <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, letterSpacing: '-1px', color: COLORS.textPrimary, fontVariantNumeric: 'tabular-nums' }}>
+            {balancePct}<span style={{ fontSize: 20, fontWeight: 700, color: COLORS.textFaint, marginLeft: 2 }}>%</span>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: COLORS.textSecondary }}>Баланс жизни</div>
+            <div style={{ fontSize: 12.5, color: COLORS.textFaint, marginTop: 2 }}>
+              {sphereCount} {sphereWord(sphereCount)} · {totalGoals} {goalWord(totalGoals)}
+            </div>
+          </div>
+        </div>
+        <PrimaryAddSphere onClick={onAddSphere} />
+      </div>
+
+      {/* Per-sphere breakdown — one labelled, colour-coded slot per sphere. Slots
+          are equal-width and wrap onto more rows when the band gets narrow (or holds
+          many spheres), so they stay readable instead of being squeezed thin. The
+          colour ties each slot to its card below (Gestalt similarity). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '14px 16px', marginTop: 18 }}>
+        {rollups.map(({ sphere, stats }) => (
+          <div key={sphere.id} style={{ minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <GoalDot color={sphere.color} size={8} />
+              <div style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 600, color: COLORS.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sphere.title}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: sphere.color, fontVariantNumeric: 'tabular-nums', flex: 'none' }}>{stats.pct}%</div>
+            </div>
+            <div style={{ height: 6, borderRadius: 4, background: `color-mix(in oklab, ${sphere.color} 14%, transparent)`, overflow: 'hidden' }}>
+              <div style={{ height: '100%', borderRadius: 4, background: sphere.color, width: stats.pct + '%', transition: 'width .3s' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Russian plural for "sphere" (1 сфера / 2 сферы / 5 сфер). */
+function sphereWord(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'сфера'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'сферы'
+  return 'сфер'
 }
 
 /** The six-dot grip that marks a drag handle. */
