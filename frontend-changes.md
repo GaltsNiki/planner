@@ -355,3 +355,87 @@ colour-coded life areas.
   next palette colour), added a goal into it (goal inherited the sphere colour),
   and overrode a sphere's colour (the change propagated to its header, rollup, goal
   dot and goal progress bar in one action).
+
+---
+---
+
+# Frontend changes — Spheres (Сферы жизни) view: life-balance summary + toolbar
+
+Front-end / UI work on the **Сферы жизни** view (`ReviewView.tsx`) only. The change
+is confined to that single file — no data models, business logic, shared helpers,
+or other views (Daily / Weekly / Habits) were touched. It reuses the existing
+`sphereStatsOf` progress helper, the `COLORS` token set, and the `GoalDot`
+primitive, so it stays inside the app's design language.
+
+## Why (design-principle audit of the previous layout)
+
+The top third of the screen — the most valuable real estate and the F/Z-pattern
+entry point — held only a long drag-instruction sentence and a faint outline
+"Добавить сферу" chip. There was **no at-a-glance sense of overall life balance**,
+which is the whole point of a "spheres of life" view. Concretely:
+
+- **Above the fold (principle 6) / Visual hierarchy (3):** no headline metric or
+  first fixation; the eye landed on a wall of equally-weighted cards.
+- **Fitts's law (1):** the primary create action was a small, low-contrast chip;
+  the verbose reorder hint occupied the top-left hotspot instead.
+- **Window zoning (4):** the top toolbar zone was underused (a hint + one weak
+  button) rather than carrying a global overview.
+
+## What changed
+
+### 1. New **"Баланс жизни"** summary band (above the fold)
+
+A headline card added at the very top of the view (`LifeBalanceBand`):
+
+- **Large mean-progress figure** (40px/700, `tabular-nums`) — the overall balance
+  across all spheres — giving the top third a strong first fixation point.
+- **Count line** — `N сфер · M целей`, with correct Russian pluralisation for
+  *both* words (`sphereWord`, reused `goalWord`).
+- **Primary "Добавить сферу" button** promoted to a **filled accent** control
+  (`PrimaryAddSphere`), anchored to the band's right edge — a large, high-contrast
+  target rather than a faint chip (Fitts's law). A single component renders it, so
+  the band and the empty-state use the exact same control.
+- **Per-sphere breakdown** — one labelled slot per sphere, each carrying its own
+  colour dot, name, `%`, and a colour-filled meter (fill = that sphere's progress).
+  The slots are a responsive `auto-fit, minmax(150px, 1fr)` grid, so which areas of
+  life lead and which lag reads instantly, the slots **wrap** gracefully with many
+  spheres (verified at 7), and each slot's colour matches its card below (Gestalt
+  similarity binds the summary to the grid).
+
+### 2. Toolbar demoted to a quiet reorder hint
+
+The old row (long sentence + weak add button) is gone. The primary action now lives
+in the summary band; what remains above the grid is a **single small, low-priority**
+grip hint, shown only when reordering is actually possible (`> 1` sphere), so it no
+longer competes with the primary action for the top-left of the screen.
+
+### 3. Empty-state parity
+
+When there are no spheres yet (so the summary band is hidden), the same
+`PrimaryAddSphere` button renders in the grid area, so the create action always has
+a prominent home.
+
+The sphere cards, goal cards, colour-coding, drag-reorder, inline rename/recolor,
+and add-goal flows are **unchanged** — the redesign only adds the summary zone and
+reworks the toolbar around them.
+
+## Design-language consistency
+
+- Summary band matches the existing Claude-summary / analytics card shell
+  (`cardBg`, `border06`, radius 18, matching padding).
+- Colours come entirely from `COLORS` and each sphere's own colour (via `color-mix`
+  for the meter track), matching the per-sphere colour story already in the cards.
+- Numerals use `tabular-nums`; spacing follows the existing 8-based rhythm.
+
+## Verification
+
+- `npm run typecheck` (node + web) — passes (exit 0).
+- `npm run test` — **98/98 pass** (no test needed changing; the change is view-only).
+- `npm run build` (electron-vite) — main, preload and renderer all build.
+- Driven in the browser preview harness (`web-preview.html`) and screenshotted:
+  - `spheres-before-1440.png` / `spheres-before-1120.png` — original layout.
+  - `spheres-after-1440.png` — new summary band + grid (3-col).
+  - `spheres-after-1120.png` — 2-col reflow, band still one row.
+  - `spheres-after-7spheres-top.png` — 7 spheres: band wraps to two rows cleanly,
+    correct `7 сфер · 4 цели` pluralisation, new spheres colour-matched across the
+    band, cards and sidebar.
