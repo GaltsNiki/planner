@@ -98,7 +98,76 @@ Default behaviour (no prop) is unchanged.
 
 ---
 
-# Frontend changes — Weekly view redesign
+# Frontend changes — Weekly view: toolbar & board layout redesign
+
+Scope: front-end / UI changes to the **Weekly view** (`Неделя`) only — specifically
+its **top toolbar** and the **day-column grid**. No data models, business logic, or
+other views were touched. Only `src/renderer/src/views/WeekView.tsx` changed; it
+**reuses** the store's existing `thisWeek()` action and the `weekAnalytics()`
+selector (nothing added to shared code). This entry documents the redesign applied
+via the `weekly_design` workflow, which targets Fitts's Law, Gestalt grouping,
+visual hierarchy, window zoning, an 8px grid, above-the-fold priority, and
+action-result proximity.
+
+## Before
+
+- Week nav (`‹ 13–19 июля ›`) was three loose elements floating mid-toolbar; the
+  arrows were small (32px) and unanchored.
+- The prime top-right corner held a **passive instructional hint** ("Перетащите
+  задачу между днями…") — dead weight in a high-value spot.
+- The week's completion figure ("5/17") lived **only** in the analytics card
+  **below the fold**, so the key overview metric was never visible on entry.
+- Empty weekend columns showed a lone "Add task" button floating at the top,
+  reading as unintentional voids.
+
+## Changes, mapped to the design principles
+
+1. **Fitts's Law** — week navigation is now a single 48px-tall pill with **40×40
+   arrow targets** (`WeekNav`), each hugging the control's edge; the
+   **week-completion summary chip** sits in the **top-right corner**
+   (`marginLeft: auto`), a Fitts-friendly Z-pattern endpoint.
+2. **Gestalt** — the two arrows + range label are bound into **one rounded surface**
+   with hairline internal dividers, so they read as a single unit (common region);
+   each day header gains a **divider** binding it to its task list; the summary chip
+   reuses the analytics meter treatment (similarity).
+3. **Visual hierarchy** — removed the **duplicate** week-range label (it already
+   shows in the app header); demoted the drag hint out of the prime corner; added a
+   small weekend dot marker so the week/weekend split reads at a glance.
+4. **Window zoning** — the top zone is now purely global controls: navigation
+   (left) + "jump to current week" + week-status summary (right corner).
+5. **Grid & spacing** — toolbar on the 8px system (48px control heights, `gap: 16`,
+   `marginBottom: 24`); the drag hint sits 12px under the board.
+6. **Above the fold** — the **week-completion summary chip**
+   ("ВЫПОЛНЕНО · 5 / 17 · meter · 29 %") now lives in the toolbar, so the single
+   most important overview metric is visible **on entry**; it also handles the
+   empty-week state ("нет задач").
+7. **Action-result proximity** — a new **"Сегодня"** button (wired to the existing
+   `thisWeek()`) appears **only when viewing another week**, beside the navigation
+   it complements; the drag hint sits directly beneath the board; every day
+   column's **"Add task"** button is **bottom-anchored** (the list takes the slack
+   via `flex: 1`), giving a consistent target across all seven columns and fixing
+   the "floating add button on empty weekend columns" problem.
+
+## New internal components (same file)
+
+- `WeekNav` — the bound week-navigation pill (arrows + range/badge + calendar opener).
+- `WeekSummaryChip` — the top-right week-completion summary (count + meter + %),
+  with an empty-state ("нет задач").
+
+## Verification
+
+- `npx tsc --noEmit -p tsconfig.web.json` — passes (0 errors).
+- `npx vitest run` — all 98 tests pass.
+- Verified in the browser preview harness (`vite.preview.config.ts`): week nav ‹ ›
+  changes weeks; the calendar picker opens anchored below the nav pill with the
+  current week highlighted; "Сегодня" appears on a non-current week and returns to
+  the current one; the summary chip shows live completion on a populated week and
+  "нет задач" on an empty one; day columns render with header dividers, weekend
+  markers, and bottom-anchored add-task buttons.
+
+---
+
+# Frontend changes — Weekly view redesign (earlier: analytics)
 
 Scope: front-end / UI changes to the **Weekly view** (`Неделя`) only. Data models,
 business logic for other views, and the Daily / Habits / Overview views were left

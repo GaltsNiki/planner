@@ -10,6 +10,7 @@ import { WeekendIdeas } from '../components/WeekendIdeas'
 import { Calendar } from '../components/Calendar'
 import { useContextMenu, type MenuItem } from '../components/ContextMenu'
 import { weekModel, weekBadge, DAY_SHORT, offsetToDate, dateToOffset, currentWeekIndex } from '@shared/dates'
+import { weekAnalytics } from '@shared/progress'
 import { ROUTINE_GOAL } from '@shared/routine'
 import { WEEKEND_IDEAS_ENABLED } from '../features'
 import { COLORS } from '../tokens'
@@ -132,11 +133,13 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
         boxShadow: isToday ? `0 6px 26px rgba(232,86,63,0.06)` : 'none'
       }}
     >
-      <div onClick={() => openDayInToday(dayIndex)} title="Открыть день" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4, cursor: 'pointer' }}>
+      <div onClick={() => openDayInToday(dayIndex)} title="Открыть день" style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 8, marginBottom: 4, borderBottom: `1px solid ${isToday ? COLORS.accent18 : COLORS.border06}`, cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.2px', color: isToday ? COLORS.accent : isWeekend ? COLORS.textFaint : COLORS.textMuted }}>{DAY_SHORT[dayIndex]}</div>
-            {isToday && <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.4px', color: COLORS.accent, textTransform: 'uppercase' }}>сегодня</div>}
+            {isToday
+              ? <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.4px', color: COLORS.accent, textTransform: 'uppercase' }}>сегодня</div>
+              : isWeekend && <div style={{ width: 4, height: 4, borderRadius: '50%', background: COLORS.textGhost }} title="Выходной" />}
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 24, padding: '0 6px', borderRadius: 7, fontSize: 13, fontWeight: 700, background: isToday ? COLORS.accent : 'transparent', color: isToday ? '#fff' : COLORS.textPrimary }}>{wm.days[dayIndex].num}</div>
         </div>
@@ -152,12 +155,14 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
         )}
       </div>
 
-      {/* Cap the list at ~8 rows; overflow scrolls within the column. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: tasks.length > MAX_VISIBLE ? MAX_VISIBLE * CARD_H : 'none', overflowY: tasks.length > MAX_VISIBLE ? 'auto' : 'visible', margin: tasks.length > MAX_VISIBLE ? '0 -4px' : 0, padding: tasks.length > MAX_VISIBLE ? '0 4px' : 0 }}>
+      {/* Cap the list at ~8 rows; overflow scrolls within the column. flex:1 lets
+          the list take the slack so the add-task button anchors to the column's
+          lower edge (a consistent, Fitts-friendly target across all seven days). */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: tasks.length > MAX_VISIBLE ? MAX_VISIBLE * CARD_H : 'none', overflowY: tasks.length > MAX_VISIBLE ? 'auto' : 'visible', margin: tasks.length > MAX_VISIBLE ? '0 -4px' : 0, padding: tasks.length > MAX_VISIBLE ? '0 4px' : 0 }}>
         {tasks.map((t) => <MiniCard key={t.id} task={t} goal={goalOf(t)} onMenu={onMenu(t)} />)}
       </div>
 
-      <div onClick={() => openNew(null, dayIndex, weekOffset)} className="row-hover" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 9, cursor: 'pointer', color: COLORS.textFaint, fontSize: 11.5 }}>
+      <div onClick={() => openNew(null, dayIndex, weekOffset)} className="row-hover" style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 9, cursor: 'pointer', color: COLORS.textFaint, fontSize: 11.5 }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>
         <span>Добавить задачу</span>
       </div>
@@ -165,8 +170,74 @@ function DayColumn({ dayIndex, tasks, onMenu }: { dayIndex: number; tasks: Task[
   )
 }
 
+/**
+ * Week-navigation control. The two arrows and the range label are bound into one
+ * common region (shared surface) so they read as a single unit (Gestalt). The
+ * arrows are large, edge-hugging hit targets (Fitts); the centre opens the
+ * calendar. `onOpenCalendar` receives the anchor point below the label.
+ */
+function WeekNav({
+  weekOffset, onPrev, onNext, onOpenCalendar
+}: {
+  weekOffset: number
+  onPrev: () => void
+  onNext: () => void
+  onOpenCalendar: (anchor: { x: number; y: number }) => void
+}): React.JSX.Element {
+  const arrow: React.CSSProperties = {
+    width: 40, height: 40, flex: 'none', borderRadius: 9, background: 'transparent', border: 'none',
+    color: COLORS.textSecondary, fontSize: 19, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+  }
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'stretch', height: 48, borderRadius: 12, background: COLORS.rowBg, border: `1px solid ${COLORS.border08}`, overflow: 'hidden' }}>
+      <button className="row-hover" onClick={onPrev} title="Предыдущая неделя" style={arrow}>‹</button>
+      <div
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          onOpenCalendar({ x: r.left, y: r.bottom + 6 })
+        }}
+        title="Открыть календарь"
+        style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 158, padding: '0 8px', textAlign: 'center', cursor: 'pointer', borderLeft: `1px solid ${COLORS.border06}`, borderRight: `1px solid ${COLORS.border06}` }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>{weekModel(weekOffset).range}</div>
+        <div style={{ fontSize: 11.5, color: COLORS.textFaint, marginTop: 1 }}>{weekBadge(weekOffset)}</div>
+      </div>
+      <button className="row-hover" onClick={onNext} title="Следующая неделя" style={arrow}>›</button>
+    </div>
+  )
+}
+
+/**
+ * Week-completion summary — the key overview metric, pulled up to the toolbar's
+ * right corner so it reads above the fold, before the analytics panel. A single
+ * grouped chip: count + inline meter.
+ */
+function WeekSummaryChip({ done, total, pct }: { done: number; total: number; pct: number }): React.JSX.Element {
+  const empty = total === 0
+  const complete = !empty && done === total
+  return (
+    <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 14, height: 48, padding: '0 18px', borderRadius: 12, background: COLORS.cardBg, border: `1px solid ${COLORS.border06}` }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: COLORS.textMuted }}>Выполнено</div>
+      {empty ? (
+        <div style={{ fontSize: 13, color: COLORS.textFaint }}>нет задач</div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+            <span style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', color: COLORS.textPrimary, fontVariantNumeric: 'tabular-nums' }}>{done}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.textMuted, fontVariantNumeric: 'tabular-nums' }}>/ {total}</span>
+          </div>
+          <div style={{ width: 96, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', borderRadius: 3, width: pct + '%', background: complete ? COLORS.success : COLORS.accentGrad, transition: 'width .3s' }} />
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: complete ? COLORS.successFg : COLORS.textSecondary, fontVariantNumeric: 'tabular-nums', minWidth: 34, textAlign: 'right' }}>{pct}%</div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function WeekView(): React.JSX.Element {
-  const { goals, tasks, weekOffset, todayIndex, shiftWeek, moveTask, reorderTask, deleteTask } = usePlanner()
+  const { goals, tasks, weekOffset, todayIndex, shiftWeek, thisWeek, moveTask, reorderTask, deleteTask } = usePlanner()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const [dragId, setDragId] = useState<string | null>(null)
   const [cal, setCal] = useState<{ x: number; y: number } | null>(null)
@@ -205,25 +276,33 @@ export function WeekView(): React.JSX.Element {
     setCal(null)
   }
 
-  const btn: React.CSSProperties = { width: 32, height: 32, borderRadius: 9, background: COLORS.rowBg, border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+  // The week's completion, surfaced in the top-right summary chip so the key
+  // metric reads above the fold (before the analytics panel below).
+  const wa = weekAnalytics(goals, tasks, weekOffset)
+  const isCurrentWeek = weekOffset === currentWeekIndex()
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-        <button className="row-hover" onClick={() => shiftWeek(-1)} style={btn}>‹</button>
-        <div
-          onClick={(e) => setCal({ x: e.currentTarget.getBoundingClientRect().left, y: e.currentTarget.getBoundingClientRect().bottom })}
-          title="Открыть календарь"
-          style={{ minWidth: 150, textAlign: 'center', cursor: 'pointer' }}
-        >
-          <div style={{ fontSize: 15, fontWeight: 700 }}>{weekModel(weekOffset).range}</div>
-          <div style={{ fontSize: 11.5, color: COLORS.textFaint, marginTop: 1 }}>{weekBadge(weekOffset)}</div>
-        </div>
-        <button className="row-hover" onClick={() => shiftWeek(1)} style={btn}>›</button>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', color: COLORS.textFaint2, fontSize: 12 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 9l4 4 2-2 4 4 5-6" /></svg>
-          Перетащите задачу между днями или измените порядок внутри дня
-        </div>
+      {/* ── Toolbar (top zone) ────────────────────────────────────────────────
+          Left: week-navigation bound into one common region (‹ range ›) plus a
+          "Сегодня" jump. Right corner (a Fitts-friendly Z-pattern endpoint):
+          the live week-completion summary. ─────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+        <WeekNav weekOffset={weekOffset} onPrev={() => shiftWeek(-1)} onNext={() => shiftWeek(1)} onOpenCalendar={setCal} />
+
+        {!isCurrentWeek && (
+          <button
+            className="row-hover"
+            onClick={() => thisWeek()}
+            title="Вернуться к текущей неделе"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 40, padding: '0 14px', borderRadius: 10, background: COLORS.rowBg, border: `1px solid ${COLORS.border08}`, color: COLORS.textSecondary, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4l2.5 1.5" /></svg>
+            Сегодня
+          </button>
+        )}
+
+        <WeekSummaryChip done={wa.done} total={wa.total} pct={wa.pct} />
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -238,6 +317,13 @@ export function WeekView(): React.JSX.Element {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Drag hint sits just under the board it describes (action-result proximity),
+          in a quiet ink so it never competes with the toolbar controls. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, color: COLORS.textFaint2, fontSize: 12 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 9l4 4 2-2 4 4 5-6" /></svg>
+        Перетащите задачу между днями или измените порядок внутри дня
+      </div>
 
       {/* Weekly analytics (compact, left) beside the weekend leisure ideas (right).
           minmax(0,…) lets both columns shrink so their inner content wraps/ellipsizes.
