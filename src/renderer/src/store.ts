@@ -59,6 +59,8 @@ interface PlannerState {
   ed: EditorDraft | null
   goalEd: GoalDraft | null
   dragOverDay: number | null
+  /** Task copied via "Копировать", waiting to be pasted. Not persisted. */
+  clipboardTask: Task | null
   leisureSeed: number
   leisureLoading: boolean
   added: Record<string, boolean>
@@ -102,6 +104,10 @@ interface PlannerState {
   /** Reorder a task to sit just before `beforeId`, adopting that task's day/week. */
   reorderTask: (id: string, beforeId: string) => void
   setDragOverDay: (day: number | null) => void
+  /** Remember a task so it can be pasted into a stage later. */
+  copyTask: (id: string) => void
+  /** Paste the copied task as a new task under the given goal/stage. */
+  pasteTask: (goalId: string, mId: string) => void
 
   // Spheres (life areas that group goals)
   addSphere: (title: string, color?: string) => string
@@ -116,6 +122,8 @@ interface PlannerState {
   updateStage: (goalId: string, mId: string, patch: Partial<Milestone>) => void
   removeStage: (goalId: string, mId: string) => void
   moveStage: (goalId: string, mId: string, dir: -1 | 1) => void
+  /** Reorder stages by drag: move `mId` to the slot `targetId` currently occupies. */
+  reorderStage: (goalId: string, mId: string, targetId: string) => void
 
   // Habits
   addHabit: () => void
@@ -195,7 +203,7 @@ export const usePlanner = create<PlannerState>((set, get) => {
   return {
     goals: [], spheres: [], tasks: [], stale: [], chats: {}, settings: {}, habits: [],
     view: 'today', activeGoalId: 'g1', dayIndex: todayDayIndex(), weekOffset: currentWeekIndex(),
-    chatOpen: true, draft: '', ed: null, goalEd: null, dragOverDay: null,
+    chatOpen: true, draft: '', ed: null, goalEd: null, dragOverDay: null, clipboardTask: null,
     leisureSeed: 0, leisureLoading: false, added: {}, addedTaskIds: {},
     sidebarCollapsed: false, ready: false, todayIndex: todayDayIndex(),
     hasApiKey: false, chatSending: false, settingsOpen: false,
@@ -281,6 +289,26 @@ export const usePlanner = create<PlannerState>((set, get) => {
     },
     moveTask: (id, day) => {
       set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, day, updatedAt: Date.now() } : t)) }))
+      persist()
+    },
+    copyTask: (id) => {
+      const task = get().tasks.find((t) => t.id === id)
+      if (task) set({ clipboardTask: task })
+    },
+    pasteTask: (goalId, mId) => {
+      const copied = get().clipboardTask
+      if (!copied) return
+      // A paste is always a fresh, not-yet-done task: it keeps the title/notes and
+      // the day/week slot, but lands under the stage it was pasted into.
+      const nt: Task = {
+        ...copied,
+        id: 'n' + Date.now() + Math.floor(Math.random() * 1000),
+        goalId,
+        mId,
+        done: false,
+        updatedAt: Date.now()
+      }
+      set((s) => ({ tasks: [...s.tasks, nt] }))
       persist()
     },
     reorderTask: (id, beforeId) => {
@@ -413,6 +441,25 @@ export const usePlanner = create<PlannerState>((set, get) => {
           const j = i + dir
           if (i < 0 || j < 0 || j >= ms.length) return g
           ;[ms[i], ms[j]] = [ms[j], ms[i]]
+          return { ...g, milestones: ms }
+        })
+      }))
+      persist()
+    },
+    reorderStage: (goalId, mId, targetId) => {
+      if (mId === targetId) return
+      set((s) => ({
+        goals: s.goals.map((g) => {
+          if (g.id !== goalId) return g
+          const ms = g.milestones.slice()
+          const from = ms.findIndex((m) => m.id === mId)
+          const target = ms.findIndex((m) => m.id === targetId)
+          if (from < 0 || target < 0) return g
+          const [moved] = ms.splice(from, 1)
+          // Drop the stage AT the target's position (not before it), so dragging
+          // down onto the last stage can actually reach the last slot. Removing
+          // the stage first already shifts later indices back by one.
+          ms.splice(target, 0, moved)
           return { ...g, milestones: ms }
         })
       }))

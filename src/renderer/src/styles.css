@@ -19,7 +19,11 @@ input, textarea { font-family: inherit; }
 .notes-body:empty:before { content: attr(data-ph); color: #5c5c62; pointer-events: none; }
 .notes-body > * { margin: 0; }
 .notes-body > * + * { margin-top: 8px; }
+/* .chk-label is the current markup; span:last-child keeps notes saved before it renders. */
+.notes-body .chk > .chk-label,
 .notes-body .chk > span:last-child { line-height: 1.4; }
+/* The label carries no placeholder text, so give an empty one height to click into. */
+.notes-body .chk > .chk-label { flex: 1; min-height: 1.4em; }
 .notes-body h3 { font-size: 15.5px; font-weight: 700; color: #f2f2f3; margin-top: 12px !important; }
 .notes-body ul, .notes-body ol { margin: 6px 0; padding-left: 22px; }
 .notes-body li { margin: 2px 0; }
@@ -35,7 +39,8 @@ input, textarea { font-family: inherit; }
   content: ""; position: absolute; left: 6px; top: 2.5px; width: 3.5px; height: 8px;
   border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
 }
-.notes-body .chk[data-chk="1"] > span:last-child { color: #6f6f75; text-decoration: line-through; }
+.notes-body .chk[data-chk="1"] > .chk-label,
+.notes-body .chk[data-chk="1"] > span:last-child:not(.chk-box) { color: #6f6f75; text-decoration: line-through; }
 
 @keyframes om-spin { to { transform: rotate(360deg); } }
 

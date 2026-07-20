@@ -25,6 +25,66 @@ function ToolButton({
   )
 }
 
+/**
+ * A fresh, unticked checklist row. The label is deliberately EMPTY: a placeholder
+ * character (&nbsp;) would sit beside the caret and typed text would land on the
+ * wrong side of it. The empty label keeps its height via CSS (.chk-label:empty),
+ * not via filler text.
+ */
+function makeCheckRow(): HTMLElement {
+  const row = document.createElement('div')
+  row.className = 'chk'
+  row.setAttribute('data-chk', '0')
+  const box = document.createElement('span')
+  box.className = 'chk-box'
+  box.contentEditable = 'false'
+  const label = document.createElement('span')
+  label.className = 'chk-label'
+  row.append(box, label)
+  return row
+}
+
+/** Put the caret inside `el`, after any existing text, so typing continues there. */
+function placeCaretIn(el: HTMLElement | null): void {
+  const selection = window.getSelection()
+  if (!el || !selection) return
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  range.collapse(false)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+/**
+ * Wrap any loose text sitting directly in the editor into a <div> block.
+ *
+ * Typing into an empty contentEditable produces a BARE TEXT NODE, while every
+ * line after an Enter becomes a <div>. That inconsistency is the root of the
+ * "Enter behaves wrong" reports: the first line can't be targeted by the
+ * `.notes-body > * + *` spacing rule (CSS cannot match a text node), Enter at its
+ * start pushes the blank line *above* the text instead of moving the text down,
+ * and Enter mid-line splits it into a bare half plus a wrapped half.
+ *
+ * Normalising to "every line is a block" makes Enter behave the same everywhere,
+ * which is what Word does. Returns true if the DOM changed.
+ */
+function normalizeBlocks(notes: HTMLElement): boolean {
+  let changed = false
+  for (const node of Array.from(notes.childNodes)) {
+    const isLooseText = node.nodeType === Node.TEXT_NODE && node.textContent?.trim()
+    // <b>/<i>/<a> written straight into the root are inline and have the same problem.
+    const isLooseInline =
+      node.nodeType === Node.ELEMENT_NODE &&
+      !['DIV', 'P', 'H3', 'UL', 'OL', 'LI', 'BR'].includes((node as HTMLElement).tagName)
+    if (!isLooseText && !isLooseInline) continue
+    const block = document.createElement('div')
+    node.replaceWith(block)
+    block.appendChild(node)
+    changed = true
+  }
+  return changed
+}
+
 export function TaskEditor(): React.JSX.Element | null {
   const { ed, goals, edField, edPickGoal, saveEd, deleteEd, closeEd } = usePlanner()
   const notesRef = useRef<HTMLDivElement>(null)
@@ -34,13 +94,24 @@ export function TaskEditor(): React.JSX.Element | null {
   const downOnBackdrop = useRef(false)
 
   // Seed the contentEditable once per opened task (uncontrolled thereafter).
+  // Re-seeding on later renders would overwrite the live DOM — wiping the caret
+  // position and any list/checkbox structure the user just made — so it is keyed
+  // strictly to the task being opened, never to `ed.desc` changing as they type.
   const key = ed ? (ed.isNew ? 'new' : ed.id || 'new') : null
   useEffect(() => {
     if (ed && notesRef.current && initKey.current !== key) {
       initKey.current = key
       // Sanitize before injecting: desc is stored HTML and may include web-sourced text.
       notesRef.current.innerHTML = sanitizeHtml(ed.desc || '')
+      // Older notes were saved with loose top-level text; give them blocks too.
+      normalizeBlocks(notesRef.current)
+      // Emit <div> rather than <p> on Enter, matching the blocks we create by hand
+      // and the `.notes-body > * + *` spacing rule. Chrome/Safari default to <div>
+      // already; this pins it so the markup can't vary by engine.
+      document.execCommand('defaultParagraphSeparator', false, 'div')
     }
+    // Let the next open re-seed, even if it's the same task id.
+    if (!ed) initKey.current = null
   }, [ed, key])
 
   // Esc closes the modal (matches the calendar / context menus).
@@ -58,24 +129,179 @@ export function TaskEditor(): React.JSX.Element | null {
   const readNotes = (): void => {
     if (notesRef.current) edField('desc', notesRef.current.innerHTML)
   }
+  /**
+   * execCommand applies to the document's current selection, so the notes area must
+   * hold focus with a live caret before any command runs. When the toolbar is used
+   * before the notes were ever clicked there is no selection inside them, and the
+   * command would silently do nothing (or format the wrong element).
+   */
+  const focusNotes = (): void => {
+    const notes = notesRef.current
+    if (!notes) return
+    const selection = window.getSelection()
+    if (!selection) return
+    const caretIsInNotes = selection.rangeCount > 0 && notes.contains(selection.getRangeAt(0).commonAncestorContainer)
+    if (caretIsInNotes) { notes.focus(); return }
+    // Place the caret at the very end of the existing notes.
+    notes.focus()
+    const range = document.createRange()
+    range.selectNodeContents(notes)
+    range.collapse(false)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
   const exec = (name: string, val?: string): void => {
+    focusNotes()
     document.execCommand(name, false, val)
     readNotes()
   }
+  /** Insert a checklist row at the caret and put the caret in its label. */
   const insertCheck = (): void => {
-    document.execCommand('insertHTML', false, '<div class="chk" data-chk="0"><span class="chk-box" contenteditable="false"></span><span>&nbsp;</span></div>')
+    focusNotes()
+    const selection = window.getSelection()
+    const notes = notesRef.current
+    if (!selection || selection.rangeCount === 0 || !notes) return
+    const row = makeCheckRow()
+    const existingRow = checkRowAtCaret()
+    const block = blockAtCaret()
+    if (existingRow) {
+      existingRow.after(row)
+    } else if (block && isBlank(block)) {
+      // Replace an empty paragraph rather than leaving a blank line above the row.
+      block.replaceWith(row)
+    } else if (block) {
+      block.after(row)
+    } else {
+      notes.appendChild(row)
+    }
+    placeCaretIn(row.querySelector('.chk-label'))
     readNotes()
   }
   const makeLink = (): void => {
     const url = window.prompt('Вставьте ссылку', 'https://')
     if (url) exec('createLink', url)
   }
-  const onNotesClick = (e: React.MouseEvent): void => {
-    const box = (e.target as HTMLElement).closest?.('.chk-box')
-    if (box) {
-      const row = box.closest('.chk')
-      if (row) { row.setAttribute('data-chk', row.getAttribute('data-chk') === '1' ? '0' : '1'); readNotes() }
+  /**
+   * The element the caret sits in. Uses the *focus* node (where the caret actually
+   * is) rather than startContainer, which for a collapsed range after a click can
+   * resolve to a container element and match a neighbouring row.
+   */
+  const elementAtCaret = (): HTMLElement | null => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return null
+    const node = selection.focusNode
+    if (!node) return null
+    const el = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement
+    return el && notesRef.current?.contains(el) ? el : null
+  }
+
+  const closestInNotes = (sel: string): HTMLElement | null => {
+    const found = elementAtCaret()?.closest?.(sel) as HTMLElement | null
+    return found && notesRef.current?.contains(found) ? found : null
+  }
+
+  /** The checklist row the caret currently sits in, or null. */
+  const checkRowAtCaret = (): HTMLElement | null => closestInNotes('.chk')
+
+  /** The list item the caret currently sits in, or null. */
+  const listItemAtCaret = (): HTMLLIElement | null => closestInNotes('li') as HTMLLIElement | null
+
+  /** The top-level block (direct child of the notes) the caret sits in, or null. */
+  const blockAtCaret = (): HTMLElement | null => {
+    const notes = notesRef.current
+    let el = elementAtCaret()
+    while (el && el.parentElement && el.parentElement !== notes) el = el.parentElement
+    return el && el !== notes && notes?.contains(el) ? el : null
+  }
+
+  const isBlank = (el: HTMLElement): boolean => !el.textContent?.replace(/ /g, ' ').trim()
+
+  /**
+   * Re-wrap loose text into blocks without disturbing the caret. normalizeBlocks
+   * moves the caret's own text node into a new parent, which would drop the caret
+   * to the start of the editor, so the offset is captured and re-applied.
+   */
+  const normalizeKeepingCaret = (): void => {
+    const notes = notesRef.current
+    const selection = window.getSelection()
+    if (!notes || !selection || selection.rangeCount === 0) return
+    const { focusNode, focusOffset } = selection
+    if (!normalizeBlocks(notes)) return
+    // The node itself survives the wrap (it is re-parented, not recreated).
+    if (focusNode && notes.contains(focusNode)) {
+      const range = document.createRange()
+      range.setStart(focusNode, Math.min(focusOffset, focusNode.textContent?.length ?? 0))
+      range.collapse(true)
+      selection.removeAllRanges()
+      selection.addRange(range)
     }
+  }
+
+  /**
+   * Word-like Enter handling. The browser's native contentEditable behaviour is
+   * wrong for our structures:
+   *  - the FIRST typed line is a bare text node, not a block, so Enter splits it
+   *    inconsistently (blank line lands above the text, halves space differently);
+   *  - inside a checklist row it clones the row *including* data-chk, so a new
+   *    line after a ticked item is born ticked and struck through;
+   *  - inside a list it never lets an empty item exit the list.
+   * Shift+Enter stays a soft break everywhere, as in Word.
+   */
+  const onNotesKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key !== 'Enter' || e.shiftKey) return
+
+    // Make sure the caret sits in a real block before the split happens.
+    normalizeKeepingCaret()
+
+    const checkRow = checkRowAtCaret()
+    if (checkRow) {
+      e.preventDefault()
+      // Enter on an empty checklist row leaves the checklist (Word's behaviour).
+      if (isBlank(checkRow)) {
+        const paragraph = document.createElement('div')
+        paragraph.appendChild(document.createElement('br'))
+        checkRow.replaceWith(paragraph)
+        placeCaretIn(paragraph)
+        readNotes()
+        return
+      }
+      // Build the row directly rather than via insertHTML: execCommand leaves the
+      // caret in the *old* row, so the next keystrokes would land on the previous
+      // item instead of the new one.
+      const newRow = makeCheckRow()
+      checkRow.after(newRow)
+      placeCaretIn(newRow.querySelector('.chk-label'))
+      readNotes()
+      return
+    }
+
+    const listItem = listItemAtCaret()
+    if (listItem && isBlank(listItem)) {
+      // Enter on an empty bullet/number breaks out to a plain paragraph.
+      e.preventDefault()
+      const list = listItem.parentElement
+      const isOrdered = list?.tagName === 'OL'
+      exec(isOrdered ? 'insertOrderedList' : 'insertUnorderedList')
+      exec('formatBlock', 'div')
+      return
+    }
+    // Non-empty list items and plain text use the native Enter, which is correct.
+  }
+
+  /**
+   * Toggle a checklist row. The whole row is the target (not just the 14px box),
+   * so clicking the label text ticks it too — but only when the click isn't a
+   * genuine text edit, i.e. the caret isn't being placed in the label.
+   */
+  const onNotesClick = (e: React.MouseEvent): void => {
+    const target = e.target as HTMLElement
+    const row = target.closest?.('.chk')
+    if (!row) return
+    const clickedBox = !!target.closest?.('.chk-box')
+    // Clicking the label should still let the user type there; only the box toggles.
+    if (!clickedBox) return
+    row.setAttribute('data-chk', row.getAttribute('data-chk') === '1' ? '0' : '1')
+    readNotes()
   }
 
   return (
@@ -118,6 +344,7 @@ export function TaskEditor(): React.JSX.Element | null {
           className="notes-body"
           data-ph="Заметки, детали, ссылки…"
           onInput={readNotes}
+          onKeyDown={onNotesKeyDown}
           onClick={onNotesClick}
           style={{ height: 200, overflowY: 'auto', padding: '4px 6px 4px 2px', color: '#c9c9cd', fontSize: 15, lineHeight: 1.62, outline: 'none' }}
         />

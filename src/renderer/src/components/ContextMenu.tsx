@@ -70,7 +70,9 @@ export function useContextMenu(): {
         <div
           key={i}
           className="row-hover"
-          onClick={() => { it.onClick(); close() }}
+          // Stop the click here: the menu sits over the row it was opened from,
+          // and letting it through would also trigger that row's own onClick.
+          onClick={(e) => { e.stopPropagation(); it.onClick(); close() }}
           style={{
             display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px',
             borderRadius: 8, cursor: 'pointer', fontSize: 13.5,

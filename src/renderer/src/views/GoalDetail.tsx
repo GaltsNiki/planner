@@ -1,7 +1,11 @@
 import React, { useState } from 'react'
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
+  closestCenter, type DragEndEvent, type DragStartEvent
+} from '@dnd-kit/core'
 import { usePlanner } from '../store'
 import { ClaudeMark } from '../components/primitives'
-import { useContextMenu } from '../components/ContextMenu'
+import { useContextMenu, type MenuItem } from '../components/ContextMenu'
 import { goalStats } from '@shared/progress'
 import { stepSegments } from '@shared/closeness'
 import { byDate } from '@shared/taskMeta'
@@ -20,7 +24,9 @@ function chipFor(status: MilestoneStatus): { label: string; bg: string; color: s
 }
 
 export function GoalDetail(): React.JSX.Element {
-  const { goals, tasks, activeGoalId, openEditGoal, openNewGoal, addStage, openNew, toggleTask } = usePlanner()
+  const { goals, tasks, activeGoalId, openEditGoal, openNewGoal, addStage, openNew, toggleTask, reorderStage } = usePlanner()
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const [dragStageId, setDragStageId] = useState<string | null>(null)
   const ag = goals.find((g) => g.id === activeGoalId) || goals[0]
 
   if (!ag) {
@@ -37,6 +43,18 @@ export function GoalDetail(): React.JSX.Element {
   // so an opened goal keeps the same colour identity it has in the Обзор view.
   const segments = stepSegments(ag, ag.dotColor)
   const deg = st.pct * 3.6
+
+  const onStageDragStart = (e: DragStartEvent): void => setDragStageId(String(e.active.id))
+  const onStageDragEnd = (e: DragEndEvent): void => {
+    setDragStageId(null)
+    const over = e.over?.id
+    // Drop target ids are prefixed so they can't collide with a stage's own draggable id.
+    if (typeof over !== 'string' || !over.startsWith('stage-')) return
+    reorderStage(ag.id, String(e.active.id), over.slice(6))
+  }
+
+  const dragStage = dragStageId ? ag.milestones.find((m) => m.id === dragStageId) : null
+  const dragStageIndex = dragStage ? ag.milestones.findIndex((m) => m.id === dragStage.id) : -1
 
   return (
     <div style={{ maxWidth: 820, margin: '0 auto' }}>
@@ -99,9 +117,16 @@ export function GoalDetail(): React.JSX.Element {
         )}
       </div>
 
-      {ag.milestones.map((m, i) => (
-        <StageSection key={m.id} goal={ag} milestone={m} index={i} total={ag.milestones.length} tasks={tasks} />
-      ))}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onStageDragStart} onDragEnd={onStageDragEnd}>
+        {ag.milestones.map((m, i) => (
+          <StageSection key={m.id} goal={ag} milestone={m} index={i} tasks={tasks} dragIndex={dragStageIndex} />
+        ))}
+        <DragOverlay dropAnimation={null}>
+          {dragStage ? (
+            <StageHeaderBody goal={ag} milestone={dragStage} index={dragStageIndex} tasks={tasks} dragging />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Add-stage button — always available on the goal page. */}
       <button
@@ -127,7 +152,7 @@ export function GoalDetail(): React.JSX.Element {
               <div style={{ marginLeft: 'auto', fontSize: 12.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums' }}>{loose.length ? `${done}/${loose.length}` : '—'}</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {loose.map((t) => <TaskLine key={t.id} task={t} onToggle={toggleTask} />)}
+              {loose.map((t) => <TaskLine key={t.id} task={t} onToggle={toggleTask} goalId={ag.id} mId={t.mId} />)}
               <AddTaskRow onClick={() => openNew(ag.id, null, null)} />
             </div>
           </div>
@@ -137,69 +162,157 @@ export function GoalDetail(): React.JSX.Element {
   )
 }
 
-interface StageSectionProps {
+interface StageHeaderBodyProps {
   goal: Goal
   milestone: Milestone
   index: number
-  total: number
   tasks: Task[]
+  /** Rendered inside the drag overlay: static, no inputs to interact with. */
+  dragging?: boolean
+  /** Drag listeners/attributes — applied to the grip handle only. */
+  handleProps?: React.HTMLAttributes<HTMLElement>
+  /** Reveal the grip/delete controls (on hover, or while dragging). */
+  showControls?: boolean
 }
 
-/** One stage on the goal page: editable title, status pill, reorder/delete, tasks + add-task. */
-function StageSection({ goal, milestone: m, index, total, tasks }: StageSectionProps): React.JSX.Element {
-  const { toggleTask, updateStage, removeStage, moveStage, openNew } = usePlanner()
-  const [hover, setHover] = useState(false)
-  const mts = tasks.filter((t) => t.goalId === goal.id && t.mId === m.id).sort(byDate)
+/**
+ * A stage's header row: grip, editable title, status pill, count, delete.
+ * Shared by the in-page stage and the drag overlay, so a dragged stage looks
+ * exactly like the row it was lifted from.
+ */
+function StageHeaderBody({ goal, milestone: m, index, tasks, dragging, handleProps, showControls }: StageHeaderBodyProps): React.JSX.Element {
+  const { updateStage, removeStage } = usePlanner()
+  const mts = tasks.filter((t) => t.goalId === goal.id && t.mId === m.id)
   const md = mts.filter((t) => t.done).length
   const chip = chipFor(m.status)
-  const first = index === 0
-  const last = index === total - 1
-
-  const ctrlBtn: React.CSSProperties = { width: 22, height: 15, background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 9, padding: 0, lineHeight: 1 }
 
   return (
-    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ marginBottom: 22 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, borderRadius: 10,
+        // The overlay gets a lifted card look; the in-page row stays flat.
+        background: dragging ? '#26262b' : 'transparent',
+        border: `1px solid ${dragging ? COLORS.accent30 : 'transparent'}`,
+        padding: dragging ? '6px 10px' : 0,
+        boxShadow: dragging ? '0 8px 22px rgba(0,0,0,0.45)' : 'none'
+      }}
+    >
+      {/* Grip — drag to reorder the stage. */}
+      <div
+        {...handleProps}
+        title="Перетащите, чтобы переставить этап"
+        style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 24, color: COLORS.textFaint2, cursor: dragging ? 'grabbing' : 'grab', opacity: showControls ? 1 : 0.28, transition: 'opacity .12s', touchAction: 'none' }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" /><circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" /></svg>
+      </div>
+      {dragging ? (
+        <div style={{ flex: 1, minWidth: 0, color: COLORS.textPrimary, fontSize: 15.5, fontWeight: 600, padding: '2px 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {m.title || `Этап ${index + 1}`}
+        </div>
+      ) : (
         <input
           value={m.title}
           onChange={(e) => updateStage(goal.id, m.id, { title: e.target.value })}
           placeholder={`Этап ${index + 1}`}
           style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', color: COLORS.textPrimary, fontSize: 15.5, fontWeight: 600, outline: 'none', padding: '2px 0' }}
         />
-        {/* Status pill — click to cycle Запланирован → В работе → Завершён. */}
-        <button
-          onClick={() => updateStage(goal.id, m.id, { status: NEXT_STATUS[m.status] })}
-          title="Сменить статус"
-          style={{ flex: 'none', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20, background: chip.bg, color: chip.color, border: 'none', cursor: 'pointer' }}
-        >
-          {chip.label}
-        </button>
-        <div style={{ fontSize: 12.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums', minWidth: 30, textAlign: 'right' }}>{mts.length ? `${md}/${mts.length}` : '—'}</div>
-        {/* Reorder + delete (reveal on hover). */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, flex: 'none', opacity: hover ? 1 : 0.28, transition: 'opacity .12s' }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <button onClick={() => moveStage(goal.id, m.id, -1)} disabled={first} title="Выше" style={{ ...ctrlBtn, color: first ? COLORS.textGhost : COLORS.textFaint, cursor: first ? 'default' : 'pointer' }}>▲</button>
-            <button onClick={() => moveStage(goal.id, m.id, 1)} disabled={last} title="Ниже" style={{ ...ctrlBtn, color: last ? COLORS.textGhost : COLORS.textFaint, cursor: last ? 'default' : 'pointer' }}>▼</button>
-          </div>
-          <button onClick={() => removeStage(goal.id, m.id)} title="Удалить этап" style={{ width: 28, height: 28, borderRadius: 8, background: 'transparent', border: 'none', color: COLORS.textFaint, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-          </button>
-        </div>
-      </div>
+      )}
+      {/* Status pill — click to cycle Запланирован → В работе → Завершён. */}
+      <button
+        onClick={() => updateStage(goal.id, m.id, { status: NEXT_STATUS[m.status] })}
+        title="Сменить статус"
+        disabled={dragging}
+        style={{ flex: 'none', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 20, background: chip.bg, color: chip.color, border: 'none', cursor: dragging ? 'grabbing' : 'pointer' }}
+      >
+        {chip.label}
+      </button>
+      <div style={{ fontSize: 12.5, color: COLORS.textFaint2, fontVariantNumeric: 'tabular-nums', minWidth: 30, textAlign: 'right' }}>{mts.length ? `${md}/${mts.length}` : '—'}</div>
+      <button
+        onClick={() => removeStage(goal.id, m.id)}
+        title="Удалить этап"
+        disabled={dragging}
+        style={{ flex: 'none', width: 28, height: 28, borderRadius: 8, background: 'transparent', border: 'none', color: COLORS.textFaint, cursor: dragging ? 'grabbing' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: showControls ? 1 : 0.28, transition: 'opacity .12s' }}
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
+      </button>
+    </div>
+  )
+}
+
+interface StageSectionProps {
+  goal: Goal
+  milestone: Milestone
+  index: number
+  tasks: Task[]
+  /** Index of the stage being dragged, or -1 when no drag is in progress. */
+  dragIndex: number
+}
+
+/** One stage on the goal page: drag-to-reorder header, tasks + add-task. */
+function StageSection({ goal, milestone: m, index, tasks, dragIndex }: StageSectionProps): React.JSX.Element {
+  const { toggleTask, openNew } = usePlanner()
+  const [hover, setHover] = useState(false)
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({ id: m.id })
+  // Also a drop target: a dragged stage takes the slot of the stage it's dropped on.
+  const { setNodeRef: setDropRef, isOver, active } = useDroppable({ id: 'stage-' + m.id })
+  const showIndicator = isOver && active?.id !== m.id
+  // Dragging downward the stage lands below this one, upward it lands above —
+  // so the insertion line has to switch edges to show where it will actually go.
+  const draggingDown = dragIndex >= 0 && dragIndex < index
+
+  const setRefs = (node: HTMLElement | null): void => { setDragRef(node); setDropRef(node) }
+
+  const mts = tasks.filter((t) => t.goalId === goal.id && t.mId === m.id).sort(byDate)
+
+  return (
+    <div
+      ref={setRefs}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        marginBottom: 22,
+        opacity: isDragging ? 0.35 : 1,
+        boxShadow: showIndicator
+          ? `inset 0 ${draggingDown ? -2 : 2}px 0 ${COLORS.accent}`
+          : 'none'
+      }}
+    >
+      <StageHeaderBody
+        goal={goal}
+        milestone={m}
+        index={index}
+        tasks={tasks}
+        handleProps={{ ...attributes, ...listeners }}
+        showControls={hover}
+      />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {mts.map((t) => <TaskLine key={t.id} task={t} onToggle={toggleTask} />)}
-        <AddTaskRow onClick={() => openNew(goal.id, null, null, m.id)} />
+        {mts.map((t) => <TaskLine key={t.id} task={t} onToggle={toggleTask} goalId={goal.id} mId={m.id} />)}
+        <AddTaskRow onClick={() => openNew(goal.id, null, null, m.id)} pasteTo={{ goalId: goal.id, mId: m.id }} />
       </div>
     </div>
   )
 }
 
-/** Dashed "add task" row used under each stage. */
-function AddTaskRow({ onClick }: { onClick: () => void }): React.JSX.Element {
+/**
+ * Dashed "add task" row used under each stage. Right-clicking it pastes a copied
+ * task — the way to paste into a stage that has no tasks to right-click yet.
+ * `pasteTo` is omitted where a paste has no stage to land in.
+ */
+function AddTaskRow({ onClick, pasteTo }: { onClick: () => void; pasteTo?: { goalId: string; mId: string } }): React.JSX.Element {
+  const { pasteTask, clipboardTask } = usePlanner()
+  const menu = useContextMenu()
+  const canPaste = !!clipboardTask && !!pasteTo
+
   return (
-    <div onClick={onClick} className="row-hover" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 15px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 13, cursor: 'pointer', color: COLORS.textFaint, fontSize: 14 }}>
+    <div
+      onClick={onClick}
+      onContextMenu={canPaste ? menu.open([{ label: 'Вставить задачу', onClick: () => pasteTask(pasteTo.goalId, pasteTo.mId) }]) : undefined}
+      className="row-hover"
+      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 15px', border: `1px dashed ${COLORS.borderDash}`, borderRadius: 13, cursor: 'pointer', color: COLORS.textFaint, fontSize: 14 }}
+    >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" strokeLinecap="round" /></svg>
       <span>Добавить задачу</span>
+      {menu.element}
     </div>
   )
 }
@@ -207,17 +320,22 @@ function AddTaskRow({ onClick }: { onClick: () => void }): React.JSX.Element {
 /**
  * A task row on the goal page. Click the checkbox to toggle done; click the row
  * (or use the right-click menu) to open the editor and update the task.
+ * `goalId`/`mId` say where a pasted copy should land — the stage this row sits in.
  */
-function TaskLine({ task, onToggle }: { task: Task; onToggle: (id: string) => void }): React.JSX.Element {
-  const { openEditor, deleteTask } = usePlanner()
+function TaskLine({ task, onToggle, goalId, mId }: { task: Task; onToggle: (id: string) => void; goalId: string; mId: string }): React.JSX.Element {
+  const { openEditor, deleteTask, copyTask, pasteTask, clipboardTask } = usePlanner()
   const menu = useContextMenu()
+  const items: MenuItem[] = [
+    { label: 'Изменить задачу', onClick: () => openEditor(task.id) },
+    { label: 'Копировать задачу', onClick: () => copyTask(task.id) }
+  ]
+  if (clipboardTask) items.push({ label: 'Вставить задачу', onClick: () => pasteTask(goalId, mId) })
+  items.push({ label: 'Удалить задачу', danger: true, onClick: () => deleteTask(task.id) })
+
   return (
     <div
       onClick={() => openEditor(task.id)}
-      onContextMenu={menu.open([
-        { label: 'Изменить задачу', onClick: () => openEditor(task.id) },
-        { label: 'Удалить задачу', danger: true, onClick: () => deleteTask(task.id) }
-      ])}
+      onContextMenu={menu.open(items)}
       className="row-hover"
       style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '12px 15px', background: COLORS.rowBg, border: `1px solid ${COLORS.border}`, borderRadius: 13, cursor: 'pointer', fontSize: 14.5 }}
     >

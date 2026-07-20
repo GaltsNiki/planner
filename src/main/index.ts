@@ -8,6 +8,10 @@ loadEnv()
 
 // App icon lives in build/ at the repo root (../../build relative to out/main).
 // .ico gives the crispest Windows taskbar/titlebar; PNG is the cross-platform fallback.
+// Windows taskbar identity. Must be identical everywhere it is used, or Windows
+// treats the pinned button and the running window as two different apps.
+const APP_USER_MODEL_ID = 'com.planner.app'
+
 const iconPath = join(
   __dirname,
   '../../build',
@@ -33,6 +37,19 @@ function createWindow(): void {
       sandbox: true
     }
   })
+
+  // Running as the shared electron.exe means Windows would otherwise pin the
+  // generic Electron runtime and re-launch it with no arguments. Declaring the
+  // relaunch command makes a pinned button reopen *this* project, under
+  // Planner's own name and icon, and keeps the pin grouped with the live window.
+  if (process.platform === 'win32') {
+    const projectRoot = join(__dirname, '../..')
+    win.setAppDetails({
+      appId: APP_USER_MODEL_ID,
+      relaunchCommand: `"${process.execPath}" "${projectRoot}"`,
+      relaunchDisplayName: 'Planner'
+    })
+  }
 
   win.on('ready-to-show', () => win.show())
 
@@ -95,7 +112,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   // Ensures Windows groups the app under its own taskbar icon (not Electron's).
-  if (process.platform === 'win32') app.setAppUserModelId('com.planner.app')
+  if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID)
   registerIpc()
   createWindow()
 

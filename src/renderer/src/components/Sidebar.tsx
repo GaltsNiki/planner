@@ -98,15 +98,14 @@ export function Sidebar(): React.JSX.Element {
         <NavItem active={view === 'today'} label="Сегодня" onClick={() => setView('today')} icon={icons.today} />
         <NavItem active={view === 'week'} label="Неделя" onClick={() => setView('week')} icon={icons.week} />
         <NavItem active={view === 'habits'} label="Привычки" onClick={() => setView('habits')} icon={icons.habits} />
-        <NavItem active={view === 'review'} label="Сферы жизни" onClick={() => setView('review')} icon={icons.review} />
+        <NavItem active={view === 'review'} label="Цели" onClick={() => setView('review')} icon={icons.review} />
       </nav>
 
       {/* Divider binds navigation (above) apart from the goals list (below) as two
           distinct common regions, instead of two look-alike uppercase captions. */}
       <div style={{ height: 1, background: COLORS.border, margin: '16px 4px 4px' }} />
 
-      {/* ── Goals zone header ── Labelled «МОИ ЦЕЛИ», not «СФЕРЫ ЖИЗНИ», so it no
-          longer collides with the identically-named nav item above. Shows a count. */}
+      {/* ── Goals zone header ── Shows a count of the goals listed below. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 8px 6px' }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.7px', color: COLORS.textMuted }}>МОИ ЦЕЛИ</div>
         {totalGoals > 0 && (

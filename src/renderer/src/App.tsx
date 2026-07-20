@@ -29,7 +29,7 @@ function useHeader(): { title: string; sub: string } {
   }
   if (view === 'week') return { title: 'Неделя', sub: weekModel(weekOffset).range }
   if (view === 'habits') return { title: 'Привычки', sub: 'Ежедневные привычки по дням недели' }
-  if (view === 'review') return { title: 'Сферы жизни', sub: 'Ваши цели по сферам жизни' }
+  if (view === 'review') return { title: 'Цели', sub: 'Ваши цели по сферам жизни' }
   return { title: ag?.title ?? '', sub: ag?.category ?? '' }
 }
 

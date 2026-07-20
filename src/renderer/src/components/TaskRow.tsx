@@ -59,20 +59,10 @@ export function TaskRow({
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Title first, bold — the primary line of each row. */}
-        {li.primary ? (
-          <a
-            href={li.primary.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={stop}
-            style={{ display: 'block', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : goal.dotColor, textDecoration: task.done ? 'line-through' : 'none' }}
-          >
-            {task.title}
-          </a>
-        ) : (
-          <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : COLORS.taskTitle, textDecoration: task.done ? 'line-through' : 'none' }}>{task.title}</div>
-        )}
+        {/* Title first, bold — the primary line of each row. It is plain text even
+            when the description carries a link: the row itself opens the editor, and
+            the link chip on the right is the only thing that navigates to the site. */}
+        <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: task.done ? COLORS.textDisabled : COLORS.taskTitle, textDecoration: task.done ? 'line-through' : 'none' }}>{task.title}</div>
 
         {caption && (
           <div
